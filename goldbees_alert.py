@@ -11,12 +11,6 @@ LAST_SIGNAL_FILE = "last_signal.json"
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-ticker_list = sheet.col_values(1)  # Column A
-
-# Remove header if present
-if ticker_list[0] == "Ticker":
-    ticker_list = ticker_list[1:]
-
 def send_msg(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.get(url, params={"chat_id": CHAT_ID, "text": msg})
@@ -39,6 +33,12 @@ scope = [
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
+
+ticker_list = sheet.col_values(1)  # Column A
+
+# Remove header if present
+if ticker_list[0] == "Ticker":
+    ticker_list = ticker_list[1:]
 
 # ✅ Load last signals
 try:
