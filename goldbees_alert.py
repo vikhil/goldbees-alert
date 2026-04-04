@@ -13,7 +13,11 @@ CHAT_ID = os.getenv("CHAT_ID")
 
 def send_msg(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.get(url, params={"chat_id": CHAT_ID, "text": msg})
+    requests.get(url, params={
+        "chat_id": CHAT_ID,
+        "text": msg,
+        "parse_mode": "Markdown"
+    })
 
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff()
@@ -22,7 +26,7 @@ def calculate_rsi(data, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-# ✅ Setup Google Sheets ONCE
+# ✅ Setup Google Sheets
 creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
 
 scope = [
@@ -34,10 +38,11 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
 
-ticker_list = sheet.col_values(1)  # Column A
+# ✅ Read tickers from Column A
+ticker_list = sheet.col_values(1)
 
 # Remove header if present
-if ticker_list[0] == "Ticker":
+if ticker_list and ticker_list[0] in ["Ticker", "Input Ticker"]:
     ticker_list = ticker_list[1:]
 
 # ✅ Load last signals
@@ -47,8 +52,14 @@ try:
 except:
     last_signals = {}
 
+# ✅ Store messages
+messages = []
+
 # 🔁 Main Loop
 for i, ticker in enumerate(ticker_list, start=2):
+    if not ticker.strip():
+        continue
+
     data = yf.download(ticker, period="5d", interval="15m")
 
     if data.empty:
@@ -68,18 +79,11 @@ for i, ticker in enumerate(ticker_list, start=2):
     elif rsi > 70:
         signal = "SELL"
 
-    msg = f"""    
-📊 {ticker}
-Price: ₹{round(price,2)}
-RSI: {round(rsi,2)}
-Signal: {signal}
-"""
-
-    # ✅ Check previous signal
+    # Check previous signal
     prev_signal = last_signals.get(ticker)
 
     if signal != prev_signal:
-        # Save to Google Sheet
+        # Update same row in sheet
         sheet.update(f"B{i}:F{i}", [[
             str(pd.Timestamp.now()),
             ticker,
@@ -88,13 +92,18 @@ Signal: {signal}
             signal
         ]])
 
-        # Send alert only if BUY/SELL
+        # Collect Telegram messages (only BUY/SELL)
         if signal != "HOLD":
-            send_msg(msg)
+            messages.append(f"📊 {ticker} → {signal} @ ₹{round(price,2)}")
 
         # Update last signal
         last_signals[ticker] = signal
 
-# ✅ Save updated signals (VERY IMPORTANT)
+# ✅ Send ONE combined message
+if messages:
+    final_msg = "🚨 *Trading Alerts*\n\n" + "\n".join(messages)
+    send_msg(final_msg)
+
+# ✅ Save signals
 with open(LAST_SIGNAL_FILE, "w") as f:
     json.dump(last_signals, f)
