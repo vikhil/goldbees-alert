@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -41,12 +42,32 @@ for ticker in TICKERS:
     elif rsi > 70:
         signal = "SELL"
 
-    msg = f"""
+    msg = f"""    
 📊 {ticker}
 Price: ₹{round(price,2)}
 RSI: {round(rsi,2)}
 Signal: {signal}
 """
+# Google Sheets logging (ADD THIS BLOCK)
+
+creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
+
+scope = ["https://spreadsheets.google.com/feeds",
+         "https://www.googleapis.com/auth/drive"]
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+
+sheet = client.open("Trading Signals").sheet1
+
+sheet.append_row([
+    str(pd.Timestamp.now()),
+    ticker,
+    round(price, 2),
+    round(rsi, 2),
+    signal
+])
+
 # Google Sheets logging
 scope = ["https://spreadsheets.google.com/feeds",
          "https://www.googleapis.com/auth/drive"]
