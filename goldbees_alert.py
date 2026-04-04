@@ -67,22 +67,5 @@ sheet.append_row([
     round(rsi, 2),
     signal
 ])
-
-# Google Sheets logging
-scope = ["https://spreadsheets.google.com/feeds",
-         "https://www.googleapis.com/auth/drive"]
-
-creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
-client = gspread.authorize(creds)
-
-sheet = client.open("Trading Signals").sheet1
-
-sheet.append_row([
-    str(pd.Timestamp.now()),
-    ticker,
-    round(price, 2),
-    round(rsi, 2),
-    signal
-])
     if signal != "HOLD":
         send_msg(msg)
