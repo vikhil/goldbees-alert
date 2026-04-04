@@ -11,7 +11,11 @@ LAST_SIGNAL_FILE = "last_signal.json"
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-TICKERS = ["GOLDBEES.NS", "CANBK.NS"]
+ticker_list = sheet.col_values(1)  # Column A
+
+# Remove header if present
+if ticker_list[0] == "Ticker":
+    ticker_list = ticker_list[1:]
 
 def send_msg(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -77,6 +81,7 @@ Signal: {signal}
     if signal != prev_signal:
         # Save to Google Sheet
         sheet.append_row([
+            "",  # keep input column empty
             str(pd.Timestamp.now()),
             ticker,
             round(price, 2),
