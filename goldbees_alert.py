@@ -48,7 +48,7 @@ except:
     last_signals = {}
 
 # 🔁 Main Loop
-for ticker in ticker_list:
+for i, ticker in enumerate(ticker_list, start=2):
     data = yf.download(ticker, period="5d", interval="15m")
 
     if data.empty:
@@ -80,14 +80,13 @@ Signal: {signal}
 
     if signal != prev_signal:
         # Save to Google Sheet
-        sheet.append_row([
-            "",  # keep input column empty
+        sheet.update(f"B{i}:F{i}", [[
             str(pd.Timestamp.now()),
             ticker,
             round(price, 2),
             round(rsi, 2),
             signal
-        ])
+        ]])
 
         # Send alert only if BUY/SELL
         if signal != "HOLD":
