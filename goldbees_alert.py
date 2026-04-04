@@ -26,7 +26,7 @@ def calculate_rsi(data, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-# ✅ Setup Google Sheets
+# Google Sheets setup
 creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
 
 scope = [
@@ -38,24 +38,22 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
 
-# ✅ Read tickers from Column A
+# Read tickers from Column A
 ticker_list = sheet.col_values(1)
 
-# Remove header if present
 if ticker_list and ticker_list[0] in ["Ticker", "Input Ticker"]:
     ticker_list = ticker_list[1:]
 
-# ✅ Load last signals
+# Load last signals
 try:
     with open(LAST_SIGNAL_FILE, "r") as f:
         last_signals = json.load(f)
 except:
     last_signals = {}
 
-# ✅ Store messages
 messages = []
 
-# 🔁 Main Loop
+# Main loop
 for i, ticker in enumerate(ticker_list, start=2):
     if not ticker.strip():
         continue
@@ -71,7 +69,6 @@ for i, ticker in enumerate(ticker_list, start=2):
 
     signal = "HOLD"
 
-    # SMART LOGIC
     if rsi < 30:
         signal = "STRONG BUY"
     elif 30 <= rsi <= 40:
@@ -79,11 +76,9 @@ for i, ticker in enumerate(ticker_list, start=2):
     elif rsi > 70:
         signal = "SELL"
 
-    # Check previous signal
     prev_signal = last_signals.get(ticker)
 
     if signal != prev_signal:
-        # Update same row in sheet
         sheet.update(f"B{i}:F{i}", [[
             str(pd.Timestamp.now()),
             ticker,
@@ -92,18 +87,20 @@ for i, ticker in enumerate(ticker_list, start=2):
             signal
         ]])
 
-        # Collect Telegram messages (only BUY/SELL)
-        if signal != "HOLD":
+        # ✅ FILTER: Only strong signals
+        if signal in ["STRONG BUY", "SELL"]:
             messages.append(f"📊 {ticker} → {signal} @ ₹{round(price,2)}")
 
-        # Update last signal
         last_signals[ticker] = signal
 
-# ✅ Send ONE combined message
+# ✅ LIMIT: Only top 5 alerts
+messages = messages[:5]
+
+# Send message
 if messages:
-    final_msg = "🚨 *Trading Alerts*\n\n" + "\n".join(messages)
+    final_msg = "🚨 *Top Trading Alerts*\n\n" + "\n".join(messages)
     send_msg(final_msg)
 
-# ✅ Save signals
+# Save signals
 with open(LAST_SIGNAL_FILE, "w") as f:
     json.dump(last_signals, f)
