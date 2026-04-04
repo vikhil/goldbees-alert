@@ -12,6 +12,7 @@ def send_msg(msg):
 data = yf.download("GOLDBEES.NS", period="1d", interval="5m")
 
 price = float(data['Close'].iloc[-1])
+send_msg(f"✅ Bot is working! Current Price: ₹{price}")
 
 print("Current Price:", price)
 
