@@ -2,6 +2,8 @@ import yfinance as yf
 import requests
 import os
 import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
