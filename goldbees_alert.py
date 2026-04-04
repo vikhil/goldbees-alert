@@ -48,7 +48,7 @@ except:
     last_signals = {}
 
 # 🔁 Main Loop
-for ticker in TICKERS:
+for ticker in ticker_list:
     data = yf.download(ticker, period="5d", interval="15m")
 
     if data.empty:
