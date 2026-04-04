@@ -130,16 +130,44 @@ for i, row in enumerate(rows, start=2):
         else:
             decision = "HOLD ⚠️"
 
-    # Capital Allocation
-    if "BREAKOUT" in decision or "Strong" in decision:
-        allocation = "20%"
-    elif "BUY" in decision:
-        allocation = "10%"
-    else:
-        allocation = "0%"
+    # 💰 SMART ALLOCATION (NEW)
 
+    if "BREAKOUT" in decision:
+        allocation_pct = 0.20
+
+    elif "Strong" in decision:
+        allocation_pct = 0.15
+
+    elif "BUY ON DIP" in decision:
+        allocation_pct = 0.10
+
+    else:
+        allocation_pct = 0.0
+
+
+    # 🔻 LOSS BOOST (ADD THIS JUST BELOW 👇)
+
+    if pl_percent < -15:
+        allocation_pct += 0.05
+    elif pl_percent < -10:
+        allocation_pct += 0.03
+
+    # 🧮 CALCULATE BUY AMOUNT
+    TOTAL_CAPITAL = 100000  # Change as per your budget
+    buy_amount = TOTAL_CAPITAL * allocation_pct
+
+    # 📦 CALCULATE BUY QUANTITY
+    if price > 0:
+        buy_qty = int(buy_amount / price)
+    else:
+        buy_qty = 0
+
+    # 🛑 SAFETY FILTER (VERY IMPORTANT)
+    if "AVOID" in decision or price < ema50:
+        buy_qty = 0
+    
     # Update Google Sheet (D to L)
-    sheet.update(f"D{i}:L{i}", [[
+    sheet.update(f"D{i}:M{i}", [[
         round(target, 2),
         round(stop_loss, 2),
         confidence,
@@ -148,15 +176,19 @@ for i, row in enumerate(rows, start=2):
         round(ema50, 2),
         round(pl_percent, 2),
         decision,
-        allocation
+        f"{int(allocation_pct*100)}%",
+        buy_qty
     ]])
-
     # Telegram alerts
     if "BUY" in decision or "PROFIT" in decision:
         messages.append(
-            f"📊 *{ticker}*\nP/L: {round(pl_percent,2)}%\n👉 {decision}\n💰 Allocation: {allocation}"
-        )
-
+            f"📊 *{ticker}*\n"
+            f"P/L: {round(pl_percent,2)}%\n"
+            f"👉 {decision}\n"
+            f"💰 Allocation: {int(allocation_pct*100)}%\n"
+            f"📦 Buy Qty: {buy_qty}"
+    )
+        
 # Portfolio Summary
 if total_invested > 0:
     portfolio_pl = ((total_value - total_invested) / total_invested) * 100
