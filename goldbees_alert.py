@@ -26,7 +26,7 @@ def calculate_rsi(data, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-# Google Sheets setup
+# ✅ Google Sheets Setup
 creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
 
 scope = [
@@ -38,24 +38,26 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
 
-# Read tickers from Column A
-ticker_list = sheet.col_values(1)
+# ✅ Read full data
+data_rows = sheet.get_all_values()
 
-if ticker_list and ticker_list[0] in ["Ticker", "Input Ticker"]:
-    ticker_list = ticker_list[1:]
-
-# Load last signals
-try:
-    with open(LAST_SIGNAL_FILE, "r") as f:
-        last_signals = json.load(f)
-except:
-    last_signals = {}
+# Remove header
+header = data_rows[0]
+rows = data_rows[1:]
 
 messages = []
 
-# Main loop
-for i, ticker in enumerate(ticker_list, start=2):
-    if not ticker.strip():
+# 🔁 MAIN LOOP
+for i, row in enumerate(rows, start=2):
+
+    try:
+        ticker = row[0]
+        qty = float(row[1])
+        buy_price = float(row[2])
+    except:
+        continue
+
+    if not ticker:
         continue
 
     data = yf.download(ticker, period="5d", interval="15m")
@@ -64,45 +66,80 @@ for i, ticker in enumerate(ticker_list, start=2):
         continue
 
     data['RSI'] = calculate_rsi(data)
+    data['EMA'] = data['Close'].ewm(span=50).mean()
+
     price = float(data['Close'].iloc[-1])
     rsi = float(data['RSI'].iloc[-1])
-    data['EMA50'] = data['Close'].ewm(span=50).mean()
-    ema = float(data['EMA50'].iloc[-1])
+    ema = float(data['EMA'].iloc[-1])
 
-    signal = "HOLD"
+    # 📊 P/L Calculation
+    pl_percent = ((price - buy_price) / buy_price) * 100
 
-    if rsi < 30 and price > ema:
-        signal = "STRONG BUY"
-    elif 30 <= rsi <= 40 and price > ema:
-        signal = "BUY"
-    elif rsi > 70 and price < ema:
-        signal = "SELL"
+    # 🎯 Dynamic Target
+    if price > ema and rsi > 60:
+        target = price * 1.06
+    elif price > ema:
+        target = price * 1.04
+    else:
+        target = price * 1.02
 
-    prev_signal = last_signals.get(ticker)
+    # 🛑 Stop Loss (reference)
+    stop_loss = buy_price * 0.98
 
-    if signal != prev_signal:
-        sheet.update(f"B{i}:F{i}", [[
-            str(pd.Timestamp.now()),
-            ticker,
-            round(price, 2),
-            round(rsi, 2),
-            signal
-        ]])
+    # ⭐ Confidence
+    if price > ema and rsi > 60:
+        confidence = "⭐⭐⭐"
+    elif price > ema:
+        confidence = "⭐⭐"
+    else:
+        confidence = "⭐"
 
-        # ✅ FILTER: Only strong signals
-        if signal in ["STRONG BUY", "SELL"]:
-            messages.append(f"📊 {ticker} → {signal} @ ₹{round(price,2)}")
+    # 🧠 DECISION ENGINE
 
-        last_signals[ticker] = signal
+    if pl_percent < 0:
+        if price < ema and rsi < 35:
+            decision = "AVOID ADD ❌"
+        elif price > ema and rsi > 45:
+            decision = "BUY ON DIP 🟢"
+        elif rsi < 30:
+            decision = "BUY ON DIP (Oversold) 🟢"
+        else:
+            decision = "HOLD ⏳"
 
-# ✅ LIMIT: Only top 5 alerts
+    elif pl_percent >= 10:
+        if price > ema and rsi > 55:
+            decision = "HOLD 🚀"
+        else:
+            decision = "BOOK PROFIT 💰"
+
+    else:
+        if price > ema:
+            decision = "HOLD 👍"
+        else:
+            decision = "HOLD ⚠️"
+
+    # 📊 Update Google Sheet
+    sheet.update(f"D{i}:K{i}", [[
+        round(target, 2),
+        round(stop_loss, 2),
+        confidence,
+        round(price, 2),
+        round(rsi, 2),
+        round(ema, 2),
+        round(pl_percent, 2),
+        decision
+    ]])
+
+    # 📲 Telegram Alerts (important only)
+    if "BUY ON DIP" in decision or "BOOK PROFIT" in decision:
+        messages.append(
+            f"📊 *{ticker}*\nP/L: {round(pl_percent,2)}%\n👉 {decision}"
+        )
+
+# 🔥 Limit alerts
 messages = messages[:5]
 
-# Send message
+# Send Telegram
 if messages:
-    final_msg = "🚨 *Top Trading Alerts*\n\n" + "\n".join(messages)
+    final_msg = "🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages)
     send_msg(final_msg)
-
-# Save signals
-with open(LAST_SIGNAL_FILE, "w") as f:
-    json.dump(last_signals, f)
