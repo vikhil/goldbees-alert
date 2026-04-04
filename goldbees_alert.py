@@ -6,8 +6,6 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 
-LAST_SIGNAL_FILE = "last_signal.json"
-
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
@@ -26,7 +24,7 @@ def calculate_rsi(data, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-# ✅ Google Sheets Setup
+# Google Sheets Setup
 creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
 
 scope = [
@@ -38,16 +36,15 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
 
-# ✅ Read full data
 data_rows = sheet.get_all_values()
-
-# Remove header
-header = data_rows[0]
 rows = data_rows[1:]
 
 messages = []
 
-# 🔁 MAIN LOOP
+# Portfolio tracking
+total_invested = 0
+total_value = 0
+
 for i, row in enumerate(rows, start=2):
 
     try:
@@ -65,78 +62,107 @@ for i, row in enumerate(rows, start=2):
     if data.empty:
         continue
 
+    # Indicators
     data['RSI'] = calculate_rsi(data)
-    data['EMA'] = data['Close'].ewm(span=50).mean()
+    data['EMA50'] = data['Close'].ewm(span=50).mean()
+    data['EMA20'] = data['Close'].ewm(span=20).mean()
+    data['VOL_AVG'] = data['Volume'].rolling(window=20).mean()
 
     price = float(data['Close'].iloc[-1])
     rsi = float(data['RSI'].iloc[-1])
-    ema = float(data['EMA'].iloc[-1])
+    ema50 = float(data['EMA50'].iloc[-1])
+    ema20 = float(data['EMA20'].iloc[-1])
+    volume = float(data['Volume'].iloc[-1])
+    vol_avg = float(data['VOL_AVG'].iloc[-1])
 
-    # 📊 P/L Calculation
+    recent_high = data['High'].rolling(window=20).max().iloc[-2]
+
+    # Portfolio calc
     pl_percent = ((price - buy_price) / buy_price) * 100
+    total_invested += qty * buy_price
+    total_value += qty * price
 
-    # 🎯 Dynamic Target
-    if price > ema and rsi > 60:
+    # Target Logic
+    if price > ema50 and rsi > 60:
         target = price * 1.06
-    elif price > ema:
+    elif price > ema50:
         target = price * 1.04
     else:
         target = price * 1.02
 
-    # 🛑 Stop Loss (reference)
+    # Stop Loss
     stop_loss = buy_price * 0.98
 
-    # ⭐ Confidence
-    if price > ema and rsi > 60:
+    # Confidence
+    if price > ema50 and rsi > 60 and volume > vol_avg:
         confidence = "⭐⭐⭐"
-    elif price > ema:
+    elif price > ema50:
         confidence = "⭐⭐"
     else:
         confidence = "⭐"
 
-    # 🧠 DECISION ENGINE
+    # Decision Engine
+    decision = "HOLD"
 
-    if pl_percent < 0:
-        if price < ema and rsi < 35:
+    # Breakout
+    if price > recent_high:
+        decision = "BUY BREAKOUT 🚀"
+
+    elif pl_percent < 0:
+        if price < ema50 and rsi < 35:
             decision = "AVOID ADD ❌"
-        elif price > ema and rsi > 45:
-            decision = "BUY ON DIP 🟢"
+        elif price > ema50 and rsi > 45 and volume > vol_avg:
+            decision = "BUY ON DIP 🟢 (Strong)"
         elif rsi < 30:
-            decision = "BUY ON DIP (Oversold) 🟢"
+            decision = "BUY ON DIP 🟢 (Oversold)"
         else:
             decision = "HOLD ⏳"
 
     elif pl_percent >= 10:
-        if price > ema and rsi > 55:
+        if price > ema50 and rsi > 55:
             decision = "HOLD 🚀"
         else:
             decision = "BOOK PROFIT 💰"
 
     else:
-        if price > ema:
+        if price > ema50:
             decision = "HOLD 👍"
         else:
             decision = "HOLD ⚠️"
 
-    # 📊 Update Google Sheet
-    sheet.update(f"D{i}:K{i}", [[
+    # Capital Allocation
+    if "BREAKOUT" in decision or "Strong" in decision:
+        allocation = "20%"
+    elif "BUY" in decision:
+        allocation = "10%"
+    else:
+        allocation = "0%"
+
+    # Update Google Sheet (D to L)
+    sheet.update(f"D{i}:L{i}", [[
         round(target, 2),
         round(stop_loss, 2),
         confidence,
         round(price, 2),
         round(rsi, 2),
-        round(ema, 2),
+        round(ema50, 2),
         round(pl_percent, 2),
-        decision
+        decision,
+        allocation
     ]])
 
-    # 📲 Telegram Alerts (important only)
-    if "BUY ON DIP" in decision or "BOOK PROFIT" in decision:
+    # Telegram alerts
+    if "BUY" in decision or "PROFIT" in decision:
         messages.append(
-            f"📊 *{ticker}*\nP/L: {round(pl_percent,2)}%\n👉 {decision}"
+            f"📊 *{ticker}*\nP/L: {round(pl_percent,2)}%\n👉 {decision}\n💰 Allocation: {allocation}"
         )
 
-# 🔥 Limit alerts
+# Portfolio Summary
+if total_invested > 0:
+    portfolio_pl = ((total_value - total_invested) / total_invested) * 100
+    messages.append(f"\n📊 *Portfolio P/L:* {round(portfolio_pl,2)}%")
+
+# Limit alerts
 messages = messages[:5]
 
 # Send Telegram
