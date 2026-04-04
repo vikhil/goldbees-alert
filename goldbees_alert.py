@@ -9,7 +9,7 @@ import json
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-TICKERS = ["GOLDBEES.NS", "CANBK.NS"]  # Add more later
+TICKERS = ["GOLDBEES.NS", "CANBK.NS"]
 
 def send_msg(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -22,6 +22,17 @@ def calculate_rsi(data, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
+# ✅ Setup Google Sheets ONCE (outside loop)
+creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
+
+scope = ["https://spreadsheets.google.com/feeds",
+         "https://www.googleapis.com/auth/drive"]
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+sheet = client.open("Trading Signals").sheet1
+
+# 🔁 Main Loop
 for ticker in TICKERS:
     data = yf.download(ticker, period="5d", interval="15m")
 
@@ -48,24 +59,16 @@ Price: ₹{round(price,2)}
 RSI: {round(rsi,2)}
 Signal: {signal}
 """
-# Google Sheets logging (ADD THIS BLOCK)
 
-creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
+    # ✅ Save to Google Sheet
+    sheet.append_row([
+        str(pd.Timestamp.now()),
+        ticker,
+        round(price, 2),
+        round(rsi, 2),
+        signal
+    ])
 
-scope = ["https://spreadsheets.google.com/feeds",
-         "https://www.googleapis.com/auth/drive"]
-
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client = gspread.authorize(creds)
-
-sheet = client.open("Trading Signals").sheet1
-
-sheet.append_row([
-    str(pd.Timestamp.now()),
-    ticker,
-    round(price, 2),
-    round(rsi, 2),
-    signal
-])
+    # ✅ Send Telegram alert only for signals
     if signal != "HOLD":
         send_msg(msg)
