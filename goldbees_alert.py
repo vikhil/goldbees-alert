@@ -9,6 +9,9 @@ import json
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
+BASE_CAPITAL = 100000   # Your capital
+PROFIT_POOL = 0         # Tracks booked profit
+
 def send_msg(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.get(url, params={
@@ -123,6 +126,10 @@ for i, row in enumerate(rows, start=2):
             decision = "HOLD 🚀"
         else:
             decision = "BOOK PROFIT 💰"
+            
+            # 💰 ADD THIS LINE
+            profit = (price - buy_price) * qty
+            PROFIT_POOL += profit
 
     else:
         if price > ema50:
@@ -154,8 +161,10 @@ for i, row in enumerate(rows, start=2):
 
     # 🧮 CALCULATE BUY AMOUNT
     TOTAL_CAPITAL = 100000  # Change as per your budget
-    buy_amount = TOTAL_CAPITAL * allocation_pct
-
+    usable_capital = max(PROFIT_POOL, 0)
+    buy_amount = usable_capital * allocation_pct
+    usable_capital = min(PROFIT_POOL, BASE_CAPITAL * 0.3)
+    
     # 📦 CALCULATE BUY QUANTITY
     if price > 0:
         buy_qty = int(buy_amount / price)
