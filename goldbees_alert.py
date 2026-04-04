@@ -5,6 +5,7 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+
 LAST_SIGNAL_FILE = "last_signal.json"
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -23,17 +24,19 @@ def calculate_rsi(data, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-# ✅ Setup Google Sheets ONCE (outside loop)
+# ✅ Setup Google Sheets ONCE
 creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
 
-scope = ["https://spreadsheets.google.com/feeds",
-         "https://www.googleapis.com/auth/drive"]
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
 
-import json
+# ✅ Load last signals
 try:
     with open(LAST_SIGNAL_FILE, "r") as f:
         last_signals = json.load(f)
@@ -68,21 +71,26 @@ RSI: {round(rsi,2)}
 Signal: {signal}
 """
 
-prev_signal = last_signals.get(ticker)
+    # ✅ Check previous signal
+    prev_signal = last_signals.get(ticker)
 
-if signal != prev_signal:
-    sheet.append_row([
-        str(pd.Timestamp.now()),
-        ticker,
-        round(price, 2),
-        round(rsi, 2),
-        signal
-    ])
+    if signal != prev_signal:
+        # Save to Google Sheet
+        sheet.append_row([
+            str(pd.Timestamp.now()),
+            ticker,
+            round(price, 2),
+            round(rsi, 2),
+            signal
+        ])
 
-    if signal != "HOLD":
-        send_msg(msg)
+        # Send alert only if BUY/SELL
+        if signal != "HOLD":
+            send_msg(msg)
 
-    last_signals[ticker] = signal
-    
-    with open(LAST_SIGNAL_FILE, "w") as f:
+        # Update last signal
+        last_signals[ticker] = signal
+
+# ✅ Save updated signals (VERY IMPORTANT)
+with open(LAST_SIGNAL_FILE, "w") as f:
     json.dump(last_signals, f)
