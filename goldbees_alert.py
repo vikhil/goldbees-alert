@@ -66,14 +66,16 @@ for i, ticker in enumerate(ticker_list, start=2):
     data['RSI'] = calculate_rsi(data)
     price = float(data['Close'].iloc[-1])
     rsi = float(data['RSI'].iloc[-1])
+    data['EMA50'] = data['Close'].ewm(span=50).mean()
+    ema = float(data['EMA50'].iloc[-1])
 
     signal = "HOLD"
 
-    if rsi < 30:
+    if rsi < 30 and price > ema:
         signal = "STRONG BUY"
-    elif 30 <= rsi <= 40:
+    elif 30 <= rsi <= 40 and price > ema:
         signal = "BUY"
-    elif rsi > 70:
+    elif rsi > 70 and price < ema:
         signal = "SELL"
 
     prev_signal = last_signals.get(ticker)
