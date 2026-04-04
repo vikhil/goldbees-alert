@@ -5,6 +5,7 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+LAST_SIGNAL_FILE = "last_signal.json"
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -31,6 +32,13 @@ scope = ["https://spreadsheets.google.com/feeds",
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
+
+import json
+try:
+    with open(LAST_SIGNAL_FILE, "r") as f:
+        last_signals = json.load(f)
+except:
+    last_signals = {}
 
 # 🔁 Main Loop
 for ticker in TICKERS:
@@ -60,7 +68,9 @@ RSI: {round(rsi,2)}
 Signal: {signal}
 """
 
-    # ✅ Save to Google Sheet
+prev_signal = last_signals.get(ticker)
+
+if signal != prev_signal:
     sheet.append_row([
         str(pd.Timestamp.now()),
         ticker,
@@ -69,6 +79,10 @@ Signal: {signal}
         signal
     ])
 
-    # ✅ Send Telegram alert only for signals
     if signal != "HOLD":
         send_msg(msg)
+
+    last_signals[ticker] = signal
+    
+    with open(LAST_SIGNAL_FILE, "w") as f:
+    json.dump(last_signals, f)
