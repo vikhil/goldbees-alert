@@ -68,14 +68,14 @@ for i, row in enumerate(rows, start=2):
     data['EMA20'] = data['Close'].ewm(span=20).mean()
     data['VOL_AVG'] = data['Volume'].rolling(window=20).mean()
 
-    price = float(data['Close'].iloc[-1])
-    rsi = float(data['RSI'].iloc[-1])
-    ema50 = float(data['EMA50'].iloc[-1])
-    ema20 = float(data['EMA20'].iloc[-1])
-    volume = float(data['Volume'].iloc[-1])
-    vol_avg = float(data['VOL_AVG'].iloc[-1])
-
-    recent_high = data['High'].rolling(window=20).max().iloc[-2]
+    price = float(data['Close'].iloc[-1].item())
+    rsi = float(data['RSI'].iloc[-1].item())
+    ema50 = float(data['EMA50'].iloc[-1].item())
+    ema20 = float(data['EMA20'].iloc[-1].item())
+    volume = float(data['Volume'].iloc[-1].item())
+    vol_avg = float(data['VOL_AVG'].iloc[-1].item())
+    
+    recent_high = float(data['High'].rolling(window=20).max().iloc[-2])
 
     # Portfolio calc
     pl_percent = ((price - buy_price) / buy_price) * 100
