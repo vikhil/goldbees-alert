@@ -211,6 +211,6 @@ if not messages:
     messages.append("No strong signals right now 📊")
 
 # 🚀 Send Telegram (forced for testing)
-if True:
+if messages:
     final_msg = "🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages)
     send_msg(final_msg)
