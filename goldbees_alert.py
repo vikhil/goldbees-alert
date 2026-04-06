@@ -206,7 +206,11 @@ if total_invested > 0:
 # Limit alerts
 messages = messages[:5]
 
-# Send Telegram
-if messages:
+# 🧪 If no signals, send default message
+if not messages:
+    messages.append("No strong signals right now 📊")
+
+# 🚀 Send Telegram (forced for testing)
+if True:
     final_msg = "🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages)
     send_msg(final_msg)
