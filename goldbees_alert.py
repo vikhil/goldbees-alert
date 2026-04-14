@@ -232,19 +232,19 @@ for i, row in enumerate(rows, start=2):
     
     # Update Google Sheet (D to N)
     sheet.update(f"D{i}:N{i}", [[
-        round(target, 2),
-        round(stop_loss, 2),
-        confidence,
-        round(price, 2),
-        round(rsi, 2),
-        round(ema50, 2),
-        round(pl_percent, 2),
-        decision,
-        f"{int(allocation_pct*100)}%",
-        buy_qty,
-        rank
+        round(target, 2),                  # D → Target
+        round(stop_loss, 2),               # E → SL
+        rank,                              # F → Rank
+        confidence,                        # G → Confidence
+        round(price, 2),                   # H → LTP
+        round(rsi, 2),                     # I → RSI
+        round(ema50, 2),                   # J → EMA
+        round(pl_percent, 2),              # K → P/L %
+        decision,                          # L → Decision
+        f"{int(allocation_pct*100)}%",     # M → Allocation
+        buy_qty                            # N → Buy Qty
     ]])
-
+    
     # Telegram alerts
     if "BUY" in decision or "PROFIT" in decision:
         messages.append(
