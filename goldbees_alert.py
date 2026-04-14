@@ -85,6 +85,38 @@ for i, row in enumerate(rows, start=2):
     data['EMA20'] = data['Close'].ewm(span=20).mean()
     data['VOL_AVG'] = data['Volume'].rolling(window=20).mean()
 
+    score = 0
+
+    # RSI Score
+    if rsi > 60:
+        score += 2
+    elif rsi > 50:
+        score += 1
+
+    # EMA Trend
+    if price > ema50:
+        score += 2
+    elif price > ema20:
+        score += 1
+
+    # Volume Strength
+    if volume > vol_avg:
+        score += 2
+
+    # Breakout Bonus
+    if price > recent_high:
+        score += 3
+    
+    # Rank Label
+    if score >= 6:
+        rank = "🔥 Strong Buy"
+    elif score >= 4:
+        rank = "👍 Good"
+    elif score >= 2:
+        rank = "⚠️ Weak"
+    else:
+        rank = "❌ Avoid"
+    
     price = float(data['Close'].iloc[-1].item())
     rsi = float(data['RSI'].iloc[-1].item())
     ema50 = float(data['EMA50'].iloc[-1].item())
@@ -196,8 +228,8 @@ for i, row in enumerate(rows, start=2):
     if "AVOID" in decision or price < ema50:
         buy_qty = 0
     
-    # Update Google Sheet (D to L)
-    sheet.update(f"D{i}:M{i}", [[
+    # Update Google Sheet (D to N)
+    sheet.update(f"D{i}:N{i}", [[
         round(target, 2),
         round(stop_loss, 2),
         confidence,
@@ -207,8 +239,10 @@ for i, row in enumerate(rows, start=2):
         round(pl_percent, 2),
         decision,
         f"{int(allocation_pct*100)}%",
-        buy_qty
+        buy_qty,
+        rank
     ]])
+
     # Telegram alerts
     if "BUY" in decision or "PROFIT" in decision:
         messages.append(
@@ -217,8 +251,9 @@ for i, row in enumerate(rows, start=2):
             f"👉 {decision}\n"
             f"💰 Allocation: {int(allocation_pct*100)}%\n"
             f"📦 Buy Qty: {buy_qty}\n"
-            f"📈 Market: {market_trend}"
-)
+            f"⭐ Rank: {rank}\n"
+            f"📈 Market: {market_trend}"    
+        )
         
 # Portfolio Summary
 if total_invested > 0:
