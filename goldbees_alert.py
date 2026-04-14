@@ -5,6 +5,7 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+^NSEI
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -41,6 +42,19 @@ sheet = client.open("Trading Signals").sheet1
 
 data_rows = sheet.get_all_values()
 rows = data_rows[1:]
+# 📊 NIFTY MARKET TREND
+nifty_data = yf.download("^NSEI", period="5d", interval="15m")
+
+nifty_data['EMA50'] = nifty_data['Close'].ewm(span=50).mean()
+
+nifty_price = float(nifty_data['Close'].iloc[-1].item())
+nifty_ema = float(nifty_data['EMA50'].iloc[-1].item())
+
+# 🧠 Market Trend
+if nifty_price > nifty_ema:
+    market_trend = "BULLISH"
+else:
+    market_trend = "BEARISH"
 
 messages = []
 
@@ -105,8 +119,15 @@ for i, row in enumerate(rows, start=2):
         confidence = "⭐"
 
     # Decision Engine
-    decision = "HOLD"
-
+    # decision = "HOLD"
+    
+    # 🚫 MARKET FILTER (VERY IMPORTANT)
+    if market_trend == "BEARISH":
+        if pl_percent >= 10:
+            decision = "BOOK PROFIT 💰"
+        else:
+            decision = "HOLD ❌ (Market Weak)"
+        
     # Breakout
     if price > recent_high:
         decision = "BUY BREAKOUT 🚀"
@@ -195,8 +216,9 @@ for i, row in enumerate(rows, start=2):
             f"P/L: {round(pl_percent,2)}%\n"
             f"👉 {decision}\n"
             f"💰 Allocation: {int(allocation_pct*100)}%\n"
-            f"📦 Buy Qty: {buy_qty}"
-    )
+            f"📦 Buy Qty: {buy_qty}\n"
+            f"📈 Market: {market_trend}"
+)
         
 # Portfolio Summary
 if total_invested > 0:
