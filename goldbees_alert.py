@@ -62,6 +62,8 @@ messages = []
 total_invested = 0
 total_value = 0
 
+updates = []
+
 for i, row in enumerate(rows, start=2):
 
     try:
@@ -93,8 +95,8 @@ for i, row in enumerate(rows, start=2):
     volume = float(data['Volume'].iloc[-1].item())
     vol_avg = float(data['VOL_AVG'].iloc[-1].item())
     
-    recent_high = float(data['High'].rolling(window=20).max().iloc[-2])
-    
+    recent_high = float(data['High'].rolling(window=20).max().iloc[-2].item())
+
     score = 0
 
     # RSI Score
@@ -231,7 +233,9 @@ for i, row in enumerate(rows, start=2):
         buy_qty = 0
     
     # Update Google Sheet (D to N)
-    sheet.update(f"D{i}:N{i}", [[
+    # ✅ STORE FOR BATCH UPDATE
+
+    updates.append([
         round(target, 2),                  # D → Target
         round(stop_loss, 2),               # E → SL
         rank,                              # F → Rank
@@ -243,7 +247,7 @@ for i, row in enumerate(rows, start=2):
         decision,                          # L → Decision
         f"{int(allocation_pct*100)}%",     # M → Allocation
         buy_qty                            # N → Buy Qty
-    ]])
+    ])
     
     # Telegram alerts
     if "BUY" in decision or "PROFIT" in decision:
@@ -256,7 +260,15 @@ for i, row in enumerate(rows, start=2):
             f"⭐ Rank: {rank}\n"
             f"📈 Market: {market_trend}"    
         )
-        
+
+# ✅ FINAL GOOGLE SHEET UPDATE (ONLY ONCE)
+if updates:
+    start_row = 2
+    end_row = start_row + len(updates) - 1
+    range_name = f"D{start_row}:N{end_row}"
+    
+    sheet.update(values=updates, range_name=range_name)
+
 # Portfolio Summary
 if total_invested > 0:
     portfolio_pl = ((total_value - total_invested) / total_invested) * 100
