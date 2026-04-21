@@ -195,7 +195,7 @@ for i, row in enumerate(data_rows, start=2):
         buy_qty = 0
 
     # ================= STORE UPDATE (ROW SAFE) =================
-    updates.append([
+    updates.append({
         "row": i,
         "data": [
             round(target, 2),                  # D → Target
@@ -210,7 +210,7 @@ for i, row in enumerate(data_rows, start=2):
             f"{int(allocation_pct*100)}%",     # M → Allocation
             buy_qty                            # N → Buy Qty
          ]
-    ])
+    })
     
     # ================= TELEGRAM =================
     if "BUY" in decision or "PROFIT" in decision:
