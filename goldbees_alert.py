@@ -5,14 +5,15 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
-"^NSEI"
 
+# ===================== CONFIG =====================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-BASE_CAPITAL = 100000   # Your capital
-PROFIT_POOL = 0         # Tracks booked profit
+BASE_CAPITAL = 100000
+PROFIT_POOL = 0
 
+# ===================== TELEGRAM =====================
 def send_msg(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.get(url, params={
@@ -21,14 +22,24 @@ def send_msg(msg):
         "parse_mode": "Markdown"
     })
 
+# ===================== RSI =====================
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    gain = (delta.where(delta > 0, 0)).rolling(period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-# Google Sheets Setup
+# ===================== TICKER CLEANER =====================
+def format_ticker(ticker):
+    ticker = str(ticker).strip().upper()
+    if ticker == "" or ticker == "NAN":
+        return None
+    if not ticker.endswith(".NS") and not ticker.endswith(".BO"):
+        ticker = ticker + ".NS"
+    return ticker
+
+# ===================== GOOGLE SHEETS =====================
 creds_dict = json.loads(os.getenv("GOOGLE_CREDS"))
 
 scope = [
@@ -40,86 +51,75 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
 
-data_rows = sheet.get_all_values()
-rows = data_rows[1:]
-# 📊 NIFTY MARKET TREND
-nifty_data = yf.download("^NSEI", period="5d", interval="15m")
+data_rows = sheet.get_all_values()[1:]  # skip header
 
-nifty_data['EMA50'] = nifty_data['Close'].ewm(span=50).mean()
+# ===================== NIFTY TREND =====================
+nifty = yf.download("^NSEI", period="5d", interval="15m")
 
-nifty_price = float(nifty_data['Close'].iloc[-1].item())
-nifty_ema = float(nifty_data['EMA50'].iloc[-1].item())
+nifty['EMA50'] = nifty['Close'].ewm(span=50).mean()
 
-# 🧠 Market Trend
-if nifty_price > nifty_ema:
-    market_trend = "BULLISH"
-else:
-    market_trend = "BEARISH"
+nifty_price = float(nifty['Close'].iloc[-1])
+nifty_ema = float(nifty['EMA50'].iloc[-1])
 
+market_trend = "BULLISH" if nifty_price > nifty_ema else "BEARISH"
+
+# ===================== TRACKING =====================
 messages = []
+updates = []
+invalid_tickers = []
 
-# Portfolio tracking
 total_invested = 0
 total_value = 0
 
-updates = []
+# ===================== MAIN LOOP =====================
+for i, row in enumerate(data_rows, start=2):
 
-for i, row in enumerate(rows, start=2):
+    ticker = format_ticker(row[0] if len(row) > 0 else "")
+    if not ticker:
+        continue
 
     try:
-        ticker = row[0]
         qty = float(row[1])
         buy_price = float(row[2])
     except:
         continue
 
-    if not ticker:
+    try:
+        data = yf.download(ticker, period="5d", interval="15m", progress=False)
+    except Exception as e:
+        invalid_tickers.append(ticker)
         continue
 
-    data = yf.download(ticker, period="5d", interval="15m")
-
-    if data.empty:
+    if data is None or data.empty:
+        invalid_tickers.append(ticker)
         continue
 
-    # Indicators
+    # ================= INDICATORS =================
     data['RSI'] = calculate_rsi(data)
     data['EMA50'] = data['Close'].ewm(span=50).mean()
     data['EMA20'] = data['Close'].ewm(span=20).mean()
-    data['VOL_AVG'] = data['Volume'].rolling(window=20).mean()
+    data['VOL_AVG'] = data['Volume'].rolling(20).mean()
 
-    
-    price = float(data['Close'].iloc[-1].item())
-    rsi = float(data['RSI'].iloc[-1].item())
-    ema50 = float(data['EMA50'].iloc[-1].item())
-    ema20 = float(data['EMA20'].iloc[-1].item())
-    volume = float(data['Volume'].iloc[-1].item())
-    vol_avg = float(data['VOL_AVG'].iloc[-1].item())
-    
-    recent_high = float(data['High'].rolling(window=20).max().iloc[-2].item())
+    price = float(data['Close'].iloc[-1])
+    rsi = float(data['RSI'].iloc[-1])
+    ema50 = float(data['EMA50'].iloc[-1])
+    ema20 = float(data['EMA20'].iloc[-1])
+    volume = float(data['Volume'].iloc[-1])
+    vol_avg = float(data['VOL_AVG'].iloc[-1])
 
+    recent_high = float(data['High'].rolling(20).max().iloc[-2])
+
+    # ================= SCORE =================
     score = 0
+    if rsi > 60: score += 2
+    elif rsi > 50: score += 1
 
-    # RSI Score
-    if rsi > 60:
-        score += 2
-    elif rsi > 50:
-        score += 1
+    if price > ema50: score += 2
+    elif price > ema20: score += 1
 
-    # EMA Trend
-    if price > ema50:
-        score += 2
-    elif price > ema20:
-        score += 1
+    if volume > vol_avg: score += 2
+    if price > recent_high: score += 3
 
-    # Volume Strength
-    if volume > vol_avg:
-        score += 2
-
-    # Breakout Bonus
-    if price > recent_high:
-        score += 3
-    
-    # Rank Label
     if score >= 6:
         rank = "🔥 Strong Buy"
     elif score >= 4:
@@ -128,14 +128,14 @@ for i, row in enumerate(rows, start=2):
         rank = "⚠️ Weak"
     else:
         rank = "❌ Avoid"
-    
 
-    # Portfolio calc
+    # ================= P/L =================
     pl_percent = ((price - buy_price) / buy_price) * 100
+
     total_invested += qty * buy_price
     total_value += qty * price
 
-    # Target Logic
+    # ================= TARGET / SL =================
     if price > ema50 and rsi > 60:
         target = price * 1.06
     elif price > ema50:
@@ -143,10 +143,9 @@ for i, row in enumerate(rows, start=2):
     else:
         target = price * 1.02
 
-    # Stop Loss
     stop_loss = buy_price * 0.98
 
-    # Confidence
+    # ================= CONFIDENCE =================
     if price > ema50 and rsi > 60 and volume > vol_avg:
         confidence = "⭐⭐⭐"
     elif price > ema50:
@@ -154,134 +153,87 @@ for i, row in enumerate(rows, start=2):
     else:
         confidence = "⭐"
 
-    # Decision Engine
-    # decision = "HOLD"
-    
-    # 🚫 MARKET FILTER (VERY IMPORTANT)
+    # ================= DECISION ENGINE =================
+    decision = "HOLD"
+
     if market_trend == "BEARISH":
+        decision = "HOLD ❌ (Market Weak)"
         if pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
-        else:
-            decision = "HOLD ❌ (Market Weak)"
-        
-    # Breakout
+
     if price > recent_high:
         decision = "BUY BREAKOUT 🚀"
 
     elif pl_percent < 0:
         if price < ema50 and rsi < 35:
             decision = "AVOID ADD ❌"
-        elif price > ema50 and rsi > 45 and volume > vol_avg:
-            decision = "BUY ON DIP 🟢 (Strong)"
-        elif rsi < 30:
-            decision = "BUY ON DIP 🟢 (Oversold)"
+        elif price > ema50 and rsi > 45:
+            decision = "BUY ON DIP 🟢"
         else:
             decision = "HOLD ⏳"
 
     elif pl_percent >= 10:
-        if price > ema50 and rsi > 55:
-            decision = "HOLD 🚀"
-        else:
-            decision = "BOOK PROFIT 💰"
-            
-            # 💰 ADD THIS LINE
-            profit = (price - buy_price) * qty
-            PROFIT_POOL += profit
+        decision = "BOOK PROFIT 💰"
 
-    else:
-        if price > ema50:
-            decision = "HOLD 👍"
-        else:
-            decision = "HOLD ⚠️"
-
-    # 💰 SMART ALLOCATION (NEW)
-
+    # ================= ALLOCATION =================
     if "BREAKOUT" in decision:
         allocation_pct = 0.20
-
-    elif "Strong" in decision:
+    elif "Strong" in rank:
         allocation_pct = 0.15
-
     elif "BUY ON DIP" in decision:
         allocation_pct = 0.10
-
     else:
         allocation_pct = 0.0
 
-
-    # 🔻 LOSS BOOST (ADD THIS JUST BELOW 👇)
-
     if pl_percent < -15:
         allocation_pct += 0.05
-    elif pl_percent < -10:
-        allocation_pct += 0.03
 
-    # 🧮 CALCULATE BUY AMOUNT
-    TOTAL_CAPITAL = 100000  # Change as per your budget
-    usable_capital = max(PROFIT_POOL, 0)
-    buy_amount = usable_capital * allocation_pct
-    usable_capital = min(PROFIT_POOL, BASE_CAPITAL * 0.3)
-    
-    # 📦 CALCULATE BUY QUANTITY
-    if price > 0:
-        buy_qty = int(buy_amount / price)
-    else:
+    buy_amount = PROFIT_POOL * allocation_pct
+    buy_qty = int(buy_amount / price) if price > 0 else 0
+
+    if "AVOID" in decision:
         buy_qty = 0
 
-    # 🛑 SAFETY FILTER (VERY IMPORTANT)
-    if "AVOID" in decision or price < ema50:
-        buy_qty = 0
-    
-    # Update Google Sheet (D to N)
-    # ✅ STORE FOR BATCH UPDATE
-
-    updates.append([
-        round(target, 2),                  # D → Target
-        round(stop_loss, 2),               # E → SL
-        rank,                              # F → Rank
-        confidence,                        # G → Confidence
-        round(price, 2),                   # H → LTP
-        round(rsi, 2),                     # I → RSI
-        round(ema50, 2),                   # J → EMA
-        round(pl_percent, 2),              # K → P/L %
-        decision,                          # L → Decision
-        f"{int(allocation_pct*100)}%",     # M → Allocation
-        buy_qty                            # N → Buy Qty
+    # ================= STORE UPDATE (ROW SAFE) =================
+    updates.append({
+        "row": i,
+        "data": [
+            round(target, 2),                  # D → Target
+            round(stop_loss, 2),               # E → SL
+            rank,                              # F → Rank
+            confidence,                        # G → Confidence
+            round(price, 2),                   # H → LTP
+            round(rsi, 2),                     # I → RSI
+            round(ema50, 2),                   # J → EMA
+            round(pl_percent, 2),              # K → P/L %
+            decision,                          # L → Decision
+            f"{int(allocation_pct*100)}%",     # M → Allocation
+            buy_qty                            # N → Buy Qty
+         ]
     ])
     
-    # Telegram alerts
+    # ================= TELEGRAM =================
     if "BUY" in decision or "PROFIT" in decision:
         messages.append(
             f"📊 *{ticker}*\n"
             f"P/L: {round(pl_percent,2)}%\n"
             f"👉 {decision}\n"
-            f"💰 Allocation: {int(allocation_pct*100)}%\n"
-            f"📦 Buy Qty: {buy_qty}\n"
-            f"⭐ Rank: {rank}\n"
-            f"📈 Market: {market_trend}"    
+            f"⭐ {rank}"
         )
 
-# ✅ FINAL GOOGLE SHEET UPDATE (ONLY ONCE)
-if updates:
-    start_row = 2
-    end_row = start_row + len(updates) - 1
-    range_name = f"D{start_row}:N{end_row}"
-    
-    sheet.update(values=updates, range_name=range_name)
+# ===================== SHEET UPDATE =====================
+for u in updates:
+    sheet.update(f"D{u['row']}:N{u['row']}", [u["data"]])
 
-# Portfolio Summary
+# ===================== SUMMARY =====================
 if total_invested > 0:
     portfolio_pl = ((total_value - total_invested) / total_invested) * 100
     messages.append(f"\n📊 *Portfolio P/L:* {round(portfolio_pl,2)}%")
 
-# Limit alerts
-messages = messages[:5]
+if invalid_tickers:
+    messages.append(f"⚠️ Invalid tickers: {', '.join(invalid_tickers)}")
 
-# 🧪 If no signals, send default message
 if not messages:
     messages.append("No strong signals right now 📊")
 
-# 🚀 Send Telegram (forced for testing)
-if messages:
-    final_msg = "🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages)
-    send_msg(final_msg)
+send_msg("🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages))
