@@ -100,7 +100,7 @@ for i, row in enumerate(data_rows, start=2):
     data['EMA20'] = data['Close'].ewm(span=20).mean()
     data['VOL_AVG'] = data['Volume'].rolling(20).mean()
 
-    price = float(data['Close'].iloc[-1])
+    price = data['Close'].iloc[-1].item()
     rsi = float(data['RSI'].iloc[-1])
     ema50 = float(data['EMA50'].iloc[-1])
     ema20 = float(data['EMA20'].iloc[-1])
@@ -223,7 +223,10 @@ for i, row in enumerate(data_rows, start=2):
 
 # ===================== SHEET UPDATE =====================
 for u in updates:
-    sheet.update(f"D{u['row']}:N{u['row']}", [u["data"]])
+    sheet.update(
+    values=[u["data"]],
+    range_name=f"D{u['row']}:N{u['row']}"
+    )
 
 # ===================== SUMMARY =====================
 if total_invested > 0:
