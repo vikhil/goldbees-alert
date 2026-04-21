@@ -53,13 +53,12 @@ sheet = client.open("Trading Signals").sheet1
 
 data_rows = sheet.get_all_values()[1:]  # skip header
 
-# ===================== NIFTY TREND =====================
-nifty = yf.download("^NSEI", period="5d", interval="15m")
-
+# ===================== NIFTY TREND (FIXED) =====================
+nifty = yf.download("^NSEI", period="5d", interval="15m", progress=False)
 nifty['EMA50'] = nifty['Close'].ewm(span=50).mean()
 
-nifty_price = float(nifty['Close'].iloc[-1])
-nifty_ema = float(nifty['EMA50'].iloc[-1])
+nifty_price = nifty['Close'].iloc[-1].item()
+nifty_ema = nifty['EMA50'].iloc[-1].item()
 
 market_trend = "BULLISH" if nifty_price > nifty_ema else "BEARISH"
 
@@ -86,7 +85,7 @@ for i, row in enumerate(data_rows, start=2):
 
     try:
         data = yf.download(ticker, period="5d", interval="15m", progress=False)
-    except Exception as e:
+    except:
         invalid_tickers.append(ticker)
         continue
 
@@ -101,13 +100,12 @@ for i, row in enumerate(data_rows, start=2):
     data['VOL_AVG'] = data['Volume'].rolling(20).mean()
 
     price = data['Close'].iloc[-1].item()
-    rsi = float(data['RSI'].iloc[-1])
-    ema50 = float(data['EMA50'].iloc[-1])
-    ema20 = float(data['EMA20'].iloc[-1])
-    volume = float(data['Volume'].iloc[-1])
-    vol_avg = float(data['VOL_AVG'].iloc[-1])
-
-    recent_high = float(data['High'].rolling(20).max().iloc[-2])
+    rsi = data['RSI'].iloc[-1].item()
+    ema50 = data['EMA50'].iloc[-1].item()
+    ema20 = data['EMA20'].iloc[-1].item()
+    volume = data['Volume'].iloc[-1].item()
+    vol_avg = data['VOL_AVG'].iloc[-1].item()
+    recent_high = data['High'].rolling(20).max().iloc[-2].item()
 
     # ================= SCORE =================
     score = 0
@@ -153,7 +151,7 @@ for i, row in enumerate(data_rows, start=2):
     else:
         confidence = "⭐"
 
-    # ================= DECISION ENGINE =================
+    # ================= DECISION =================
     decision = "HOLD"
 
     if market_trend == "BEARISH":
@@ -163,7 +161,6 @@ for i, row in enumerate(data_rows, start=2):
 
     if price > recent_high:
         decision = "BUY BREAKOUT 🚀"
-
     elif pl_percent < 0:
         if price < ema50 and rsi < 35:
             decision = "AVOID ADD ❌"
@@ -171,7 +168,6 @@ for i, row in enumerate(data_rows, start=2):
             decision = "BUY ON DIP 🟢"
         else:
             decision = "HOLD ⏳"
-
     elif pl_percent >= 10:
         decision = "BOOK PROFIT 💰"
 
@@ -194,24 +190,24 @@ for i, row in enumerate(data_rows, start=2):
     if "AVOID" in decision:
         buy_qty = 0
 
-    # ================= STORE UPDATE (ROW SAFE) =================
+    # ================= STORE ROW =================
     updates.append({
         "row": i,
         "data": [
-            round(target, 2),                  # D → Target
-            round(stop_loss, 2),               # E → SL
-            rank,                              # F → Rank
-            confidence,                        # G → Confidence
-            round(price, 2),                   # H → LTP
-            round(rsi, 2),                     # I → RSI
-            round(ema50, 2),                   # J → EMA
-            round(pl_percent, 2),              # K → P/L %
-            decision,                          # L → Decision
-            f"{int(allocation_pct*100)}%",     # M → Allocation
-            buy_qty                            # N → Buy Qty
-         ]
+            round(target, 2),
+            round(stop_loss, 2),
+            rank,
+            confidence,
+            round(price, 2),
+            round(rsi, 2),
+            round(ema50, 2),
+            round(pl_percent, 2),
+            decision,
+            f"{int(allocation_pct*100)}%",
+            buy_qty
+        ]
     })
-    
+
     # ================= TELEGRAM =================
     if "BUY" in decision or "PROFIT" in decision:
         messages.append(
@@ -221,11 +217,12 @@ for i, row in enumerate(data_rows, start=2):
             f"⭐ {rank}"
         )
 
-# ===================== SHEET UPDATE =====================
-for u in updates:
+# ===================== GOOGLE SHEETS (FIXED - SINGLE BATCH UPDATE) =====================
+if updates:
+    all_values = [u["data"] for u in updates]
     sheet.update(
-    values=[u["data"]],
-    range_name=f"D{u['row']}:N{u['row']}"
+        range_name=f"D2:N{len(all_values)+1}",
+        values=all_values
     )
 
 # ===================== SUMMARY =====================
