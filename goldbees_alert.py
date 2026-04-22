@@ -239,11 +239,26 @@ for i, row in enumerate(data_rows, start=2):
 
 batch_data = []
 
+# ===================== BULK SHEET UPDATE =====================
+
+# Get full sheet again (including header)
+full_data = sheet.get_all_values(value_render_option="UNFORMATTED_VALUE")
+
+# Ensure enough columns exist
+required_cols = 14  # A to N
+for r in range(len(full_data)):
+    if len(full_data[r]) < required_cols:
+        full_data[r].extend([""] * (required_cols - len(full_data[r])))
+
+# Apply updates in memory
 for u in updates:
-    batch_data.append({
-        "range": f"D{u['row']}:O{u['row']}",
-        "values": [u["data"]]
-    })
+    row_idx = u["row"] - 1  # zero-based index
+
+    for col_offset, value in enumerate(u["data"]):
+        full_data[row_idx][3 + col_offset] = value   # Column D = index 3
+
+# Push everything in ONE API call
+sheet.update(full_data)
 
 if batch_data:
     sheet.batch_update(batch_data)
