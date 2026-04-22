@@ -5,6 +5,11 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+from datetime import datetime
+import pytz
+
+IST = pytz.timezone("Asia/Kolkata")
+current_time = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
 
 # ===================== CONFIG =====================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -52,6 +57,19 @@ client = gspread.authorize(creds)
 sheet = client.open("Trading Signals").sheet1
 
 data_rows = sheet.get_all_values()[1:]  # skip header
+
+from datetime import datetime
+import pytz
+
+IST = pytz.timezone("Asia/Kolkata")
+
+hour = datetime.now(IST).hour
+minute = datetime.now(IST).minute
+
+# Market time: 9:15 AM to 3:30 PM IST
+if not ((hour > 9 or (hour == 9 and minute >= 15)) and (hour < 15 or (hour == 15 and minute <= 30))):
+    send_msg("⏳ Market Closed - No update")
+    exit()
 
 # ===================== NIFTY TREND (FIXED) =====================
 nifty = yf.download("^NSEI", period="5d", interval="15m", progress=False)
@@ -198,6 +216,7 @@ for i, row in enumerate(data_rows, start=2):
     updates.append({
         "row": i,
         "data": [
+            current_time,
             round(target, 2),
             round(stop_loss, 2),
             rank,
@@ -227,7 +246,7 @@ batch_data = []
 
 for u in updates:
     batch_data.append({
-        "range": f"D{u['row']}:N{u['row']}",
+        "range": f"D{u['row']}:O{u['row']}",
         "values": [u["data"]]
     })
 
