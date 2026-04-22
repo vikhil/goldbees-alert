@@ -75,6 +75,10 @@ for i, row in enumerate(data_rows, start=2):
 
     ticker = format_ticker(row[0] if len(row) > 0 else "")
     if not ticker:
+        updates.append({
+        "row": i,
+        "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", ""]
+        })
         continue
 
     try:
@@ -217,13 +221,18 @@ for i, row in enumerate(data_rows, start=2):
             f"⭐ {rank}"
         )
 
-# ===================== GOOGLE SHEETS (FIXED - SINGLE BATCH UPDATE) =====================
-if updates:
-    all_values = [u["data"] for u in updates]
-    sheet.update(
-        range_name=f"D2:N{len(all_values)+1}",
-        values=all_values
-    )
+# ===================== GOOGLE SHEETS (ROW SAFE BATCH UPDATE) =====================
+
+batch_data = []
+
+for u in updates:
+    batch_data.append({
+        "range": f"D{u['row']}:N{u['row']}",
+        "values": [u["data"]]
+    })
+
+if batch_data:
+    sheet.batch_update(batch_data)
 
 # ===================== SUMMARY =====================
 if total_invested > 0:
