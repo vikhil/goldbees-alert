@@ -58,11 +58,6 @@ sheet = client.open("Trading Signals").sheet1
 
 data_rows = sheet.get_all_values()[1:]  # skip header
 
-from datetime import datetime
-import pytz
-
-IST = pytz.timezone("Asia/Kolkata")
-
 hour = datetime.now(IST).hour
 minute = datetime.now(IST).minute
 
