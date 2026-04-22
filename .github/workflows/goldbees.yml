@@ -2,7 +2,7 @@ name: GoldBees Alert
 
 on:
   schedule:
-    - cron: "0,30 3-10 * * 1-5"
+    - cron: "*/5 * * * *"   # every 5 minutes
   workflow_dispatch:
 
 jobs:
