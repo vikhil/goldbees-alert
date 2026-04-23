@@ -101,7 +101,7 @@ for i, row in enumerate(data_rows, start=2):
         continue
 
     try:
-        data = yf.download(ticker, period="5d", interval="15m", progress=False)
+        data = yf.download(ticker, period="1d", interval="5m", progress=False)
     except:
         invalid_tickers.append(ticker)
         continue
@@ -123,7 +123,7 @@ for i, row in enumerate(data_rows, start=2):
     volume = data['Volume'].iloc[-1].item()
     vol_avg = data['VOL_AVG'].iloc[-1].item()
     recent_high = data['High'].rolling(20).max().iloc[-2].item()
-
+    
     # ================= SCORE =================
     score = 0
     if rsi > 60: score += 2
