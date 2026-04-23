@@ -105,8 +105,8 @@ for i, row in enumerate(data_rows, start=2):
     ticker = format_ticker(row[0] if len(row) > 0 else "")
     if not ticker:
         updates.append({
-        "row": actual_row
-        "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", ""]
+            "row": i,
+            "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", "", ""]
         })
         continue
 
