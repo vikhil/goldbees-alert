@@ -16,16 +16,19 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 BASE_CAPITAL = 100000
-PROFIT_POOL = 0
+PROFIT_POOL = BASE_CAPITAL * 0.2
 
 # ===================== TELEGRAM =====================
 def send_msg(msg):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.get(url, params={
-        "chat_id": CHAT_ID,
-        "text": msg,
-        "parse_mode": "Markdown"
-    })
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.get(url, params={
+            "chat_id": CHAT_ID,
+            "text": msg,
+            "parse_mode": "Markdown"
+        }, timeout=10)
+    except Exception as e:
+        print("Telegram error:", e)
 
 # ===================== RSI =====================
 def calculate_rsi(data, period=14):
@@ -101,13 +104,13 @@ for i, row in enumerate(data_rows, start=2):
         continue
 
     try:
-        data = yf.download(ticker, period="1d", interval="5m", progress=False)
+        data = yf.download(list_of_tickers, period="1d", interval="5m", progress=False)
     except:
         invalid_tickers.append(ticker)
         continue
 
     if data is None or data.empty:
-        invalid_tickers.append(ticker)
+        invalid_tickers.append(f"{ticker} (no data)")
         continue
 
     # ================= INDICATORS =================
@@ -155,9 +158,10 @@ for i, row in enumerate(data_rows, start=2):
     volume = data['Volume'].iloc[-1].item()
     vol_avg = data['VOL_AVG'].iloc[-1].item()
     recent_high = data['High'].rolling(20).max().iloc[-2].item()
-    vwap = data['VWAP'].iloc[-1].item()
-    adx = float(data['ADX'].iloc[-1]) if not pd.isna(data['ADX'].iloc[-1]) else 0    
-    
+    vwap = data['VWAP'].iloc[-1].item()  
+    adx_val = data['ADX'].iloc[-1]
+    adx = float(adx_val) if pd.notna(adx_val) else 0
+
     # ================= SCORE =================
     score = 0
     if rsi > 60: score += 2
@@ -302,7 +306,9 @@ for u in updates:
         full_data[row_idx][3 + col_offset] = value   # Column D = index 3
 
 # Push everything in ONE API call
-sheet.update(full_data)
+for u in updates:
+    cell_range = f"D{u['row']}:O{u['row']}"
+    sheet.update(cell_range, [u["data"]])
 
 if batch_data:
     sheet.batch_update(batch_data)
