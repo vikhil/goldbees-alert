@@ -121,22 +121,19 @@ for i, row in enumerate(data_rows, start=2):
 
         try:
             data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
-    #    except:
-    #        invalid_tickers.append(ticker)
-    #        continue
 
             if data is None or data.empty:
                 invalid_tickers.append(ticker)
                 continue
 
+            # FIX: flatten multi-level columns
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.get_level_values(0)
+
         except Exception as e:
                 print(f"Yahoo error for {ticker}: {e}")
                 invalid_tickers.append(ticker)
                 continue
-    
-     # FIX: flatten multi-level columns
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = data.columns.get_level_values(0)
     
     # ================= INDICATORS =================
     data['RSI'] = calculate_rsi(data)
