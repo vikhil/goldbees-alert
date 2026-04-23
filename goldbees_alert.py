@@ -14,19 +14,26 @@ current_time = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
 # ===================== CONFIG =====================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
+print("TOKEN:", TOKEN)
+print("CHAT_ID:", CHAT_ID)
 
 BASE_CAPITAL = 100000
 PROFIT_POOL = BASE_CAPITAL * 0.2
 
 # ===================== TELEGRAM =====================
 def send_msg(msg):
+    if not TOKEN or not CHAT_ID:
+        print("Missing Telegram credentials")
+        return
+
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        requests.get(url, params={
+        response = requests.get(url, params={
             "chat_id": CHAT_ID,
             "text": msg,
             "parse_mode": "Markdown"
         }, timeout=10)
+        print("Telegram status:", response.status_code, response.text)
     except Exception as e:
         print("Telegram error:", e)
 
@@ -88,11 +95,12 @@ total_value = 0
 
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
+    actual_row = i + 1  # FIX OFFSET
 
     ticker = format_ticker(row[0] if len(row) > 0 else "")
     if not ticker:
         updates.append({
-        "row": i,
+        "row": actual_row
         "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", ""]
         })
         continue
@@ -104,7 +112,7 @@ for i, row in enumerate(data_rows, start=2):
         continue
 
     try:
-        data = yf.download(tickers, period="1d", interval="5m", progress=False)
+        data = yf.download(ticker, period="1d", interval="5m", progress=False)
     except:
         invalid_tickers.append(ticker)
         continue
