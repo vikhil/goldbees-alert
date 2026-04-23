@@ -23,17 +23,20 @@ PROFIT_POOL = BASE_CAPITAL * 0.2
 # ===================== TELEGRAM =====================
 def send_msg(msg):
     if not TOKEN or not CHAT_ID:
-        print("Missing Telegram credentials")
+        print("❌ Missing Telegram TOKEN or CHAT_ID")
         return
 
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        response = requests.get(url, params={
+        res = requests.get(url, params={
             "chat_id": CHAT_ID,
             "text": msg,
             "parse_mode": "Markdown"
         }, timeout=10)
-        print("Telegram status:", response.status_code, response.text)
+
+        print("Telegram response:", res.status_code)
+        print(res.text)
+
     except Exception as e:
         print("Telegram error:", e)
 
@@ -72,9 +75,9 @@ hour = datetime.now(IST).hour
 minute = datetime.now(IST).minute
 
 # Market time: 9:15 AM to 3:30 PM IST
-if not ((hour > 9 or (hour == 9 and minute >= 15)) and (hour < 15 or (hour == 15 and minute <= 30))):
-    send_msg("⏳ Market Closed - No update")
-    exit()
+# if not ((hour > 9 or (hour == 9 and minute >= 15)) and (hour < 15 or (hour == 15 and minute <= 30))):
+#    send_msg("⏳ Market Closed - No update")
+#    exit()
 
 # ===================== NIFTY TREND (FIXED) =====================
 nifty = yf.download("^NSEI", period="5d", interval="15m", progress=False)
@@ -89,6 +92,8 @@ market_trend = "BULLISH" if nifty_price > nifty_ema else "BEARISH"
 messages = []
 updates = []
 invalid_tickers = []
+
+print("Script started")
 
 total_invested = 0
 total_value = 0
@@ -290,6 +295,9 @@ for i, row in enumerate(data_rows, start=2):
             f"👉 {decision}\n"
             f"⭐ {rank}"
         )
+
+print("Updates count:", len(updates))
+print("Messages count:", len(messages))
 
 # ===================== GOOGLE SHEETS (ROW SAFE BATCH UPDATE) =====================
 
