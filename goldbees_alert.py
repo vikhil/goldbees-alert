@@ -249,11 +249,12 @@ for i, row in enumerate(data_rows, start=2):
             decision = "BUY ON DIP 🟢"
         else:
             decision = "HOLD ⏳"
-        elif pl_percent >= 10:
-            decision = "BOOK PROFIT 💰"
+    
+    elif pl_percent >= 10:
+        decision = "BOOK PROFIT 💰"
 
-        elif price < trail_stop and pl_percent > 5:
-            decision = "TRAIL STOP EXIT 🔻"
+    elif price < trail_stop and pl_percent > 5:
+        decision = "TRAIL STOP EXIT 🔻"
 
     # ================= ALLOCATION =================
     if "BREAKOUT" in decision:
