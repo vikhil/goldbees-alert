@@ -116,6 +116,33 @@ for i, row in enumerate(data_rows, start=2):
     data['EMA20'] = data['Close'].ewm(span=20).mean()
     data['VOL_AVG'] = data['Volume'].rolling(20).mean()
 
+    # ===== NEW: VWAP =====
+    data['VWAP'] = (data['Volume'] * (data['High'] + data['Low'] + data['Close']) / 3).cumsum() / data['Volume'].cumsum()
+    
+    # ===== NEW: ADX (Trend Strength) =====
+    high = data['High']
+    low = data['Low']
+    close = data['Close']
+
+    plus_dm = high.diff()
+    minus_dm = low.diff()
+    
+    plus_dm[plus_dm < 0] = 0
+    minus_dm[minus_dm > 0] = 0
+    
+    tr1 = high - low
+    tr2 = abs(high - close.shift())
+    tr3 = abs(low - close.shift())
+    
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(14).mean()
+    
+    plus_di = 100 * (plus_dm.rolling(14).mean() / atr)
+    minus_di = abs(100 * (minus_dm.rolling(14).mean() / atr))
+    
+    adx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
+    data['ADX'] = adx.rolling(14).mean()
+
     price = data['Close'].iloc[-1].item()
     rsi = data['RSI'].iloc[-1].item()
     ema50 = data['EMA50'].iloc[-1].item()
@@ -123,6 +150,8 @@ for i, row in enumerate(data_rows, start=2):
     volume = data['Volume'].iloc[-1].item()
     vol_avg = data['VOL_AVG'].iloc[-1].item()
     recent_high = data['High'].rolling(20).max().iloc[-2].item()
+    vwap = data['VWAP'].iloc[-1].item()
+    adx = data['ADX'].iloc[-1].item()
     
     # ================= SCORE =================
     score = 0
@@ -135,11 +164,21 @@ for i, row in enumerate(data_rows, start=2):
     if volume > vol_avg: score += 2
     if price > recent_high: score += 3
 
-    if score >= 6:
+    # ===== SMART FILTERS =====
+    if price > vwap:
+        score += 1   # intraday strength
+    
+    if adx > 25:
+        score += 2   # strong trend
+    elif adx > 20:
+        score += 1
+    
+    # ===== FINAL RANK =====
+    if score >= 7:
         rank = "🔥 Strong Buy"
-    elif score >= 4:
+    elif score >= 5:
         rank = "👍 Good"
-    elif score >= 2:
+    elif score >= 3:
         rank = "⚠️ Weak"
     else:
         rank = "❌ Avoid"
@@ -172,20 +211,20 @@ for i, row in enumerate(data_rows, start=2):
     decision = "HOLD"
 
     if market_trend == "BEARISH":
-        decision = "HOLD ❌ (Market Weak)"
+        decision = "⛔ NO TRADE (Market Weak)"
         if pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
 
-    if price > recent_high:
+    if price > recent_high and volume > vol_avg and adx > 20:
         decision = "BUY BREAKOUT 🚀"
     elif pl_percent < 0:
         if price < ema50 and rsi < 35:
             decision = "AVOID ADD ❌"
-        elif price > ema50 and rsi > 45:
+        elif price > ema50 and rsi > 45 and price > vwap:
             decision = "BUY ON DIP 🟢"
         else:
             decision = "HOLD ⏳"
-    elif pl_percent >= 10:
+    elif pl_percent >= 10 or (rsi > 70 and price < ema20):
         decision = "BOOK PROFIT 💰"
 
     # ================= ALLOCATION =================
