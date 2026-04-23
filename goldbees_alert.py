@@ -118,7 +118,7 @@ for i, row in enumerate(data_rows, start=2):
             buy_price = float(row[2])
         except:
             continue
-
+        # ================= YAHOO DATA =================
         try:
             data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
 
@@ -135,55 +135,55 @@ for i, row in enumerate(data_rows, start=2):
             invalid_tickers.append(ticker)
             continue
     
-    # ================= INDICATORS =================
-    data['RSI'] = calculate_rsi(data)
-    data['EMA50'] = data['Close'].ewm(span=50).mean()
-    data['EMA20'] = data['Close'].ewm(span=20).mean()
-    data['VOL_AVG'] = data['Volume'].rolling(20).mean()
+        # ================= INDICATORS =================
+        data['RSI'] = calculate_rsi(data)
+        data['EMA50'] = data['Close'].ewm(span=50).mean()
+        data['EMA20'] = data['Close'].ewm(span=20).mean()
+        data['VOL_AVG'] = data['Volume'].rolling(20).mean()
 
-    # ===== NEW: VWAP =====
-    data['VWAP'] = (data['Volume'] * (data['High'] + data['Low'] + data['Close']) / 3).cumsum() / data['Volume'].cumsum()
+        # ===== NEW: VWAP =====
+        data['VWAP'] = (data['Volume'] * (data['High'] + data['Low'] + data['Close']) / 3).cumsum() / data['Volume'].cumsum()
+        
+        # ===== FIXED ADX (SAFE SINGLE COLUMN) =====
+        high = data['High']
+        low = data['Low']
+        close = data['Close']
     
-    # ===== FIXED ADX (SAFE SINGLE COLUMN) =====
-    high = data['High']
-    low = data['Low']
-    close = data['Close']
-
-    # True Range
-    tr = pd.concat([
-        high - low,
-        (high - close.shift()).abs(),
-        (low - close.shift()).abs()
-    ], axis=1).max(axis=1)
-
-    atr = tr.rolling(14).mean()
-
-    # Directional Movement
-    plus_dm = high.diff()
-    minus_dm = -low.diff()
-
-    plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0.0)
-    minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0.0)
+        # True Range
+        tr = pd.concat([
+            high - low,
+            (high - close.shift()).abs(),
+            (low - close.shift()).abs()
+        ], axis=1).max(axis=1)
     
-    # DI
-    plus_di = 100 * (plus_dm.rolling(14).mean() / atr)
-    minus_di = 100 * (minus_dm.rolling(14).mean() / atr)
-    
-    # ADX
-    dx = ((plus_di - minus_di).abs() / (plus_di + minus_di)) * 100
-    dx = dx.squeeze()
-    data['ADX'] = dx.rolling(14).mean()
+        atr = tr.rolling(14).mean()
 
-    price = data['Close'].iloc[-1].item()
-    rsi = data['RSI'].iloc[-1].item()
-    ema50 = data['EMA50'].iloc[-1].item()
-    ema20 = data['EMA20'].iloc[-1].item()
-    volume = data['Volume'].iloc[-1].item()
-    vol_avg = data['VOL_AVG'].iloc[-1].item()
-    recent_high = data['High'].rolling(20).max().iloc[-2].item()
-    vwap = data['VWAP'].iloc[-1].item()  
-    adx_val = data['ADX'].iloc[-1]
-    adx = float(adx_val) if pd.notna(adx_val) else 0
+        # Directional Movement
+        plus_dm = high.diff()
+        minus_dm = -low.diff()
+    
+        plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0.0)
+        minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0.0)
+        
+        # DI
+        plus_di = 100 * (plus_dm.rolling(14).mean() / atr)
+        minus_di = 100 * (minus_dm.rolling(14).mean() / atr)
+        
+        # ADX
+        dx = ((plus_di - minus_di).abs() / (plus_di + minus_di)) * 100
+        dx = dx.squeeze()
+        data['ADX'] = dx.rolling(14).mean()
+    
+        price = data['Close'].iloc[-1].item()
+        rsi = data['RSI'].iloc[-1].item()
+        ema50 = data['EMA50'].iloc[-1].item()
+        ema20 = data['EMA20'].iloc[-1].item()
+        volume = data['Volume'].iloc[-1].item()
+        vol_avg = data['VOL_AVG'].iloc[-1].item()
+        recent_high = data['High'].rolling(20).max().iloc[-2].item()
+        vwap = data['VWAP'].iloc[-1].item()  
+        adx_val = data['ADX'].iloc[-1]
+        adx = float(adx_val) if pd.notna(adx_val) else 0
 
     # ================= SCORE =================
     score = 0
