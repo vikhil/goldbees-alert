@@ -117,7 +117,7 @@ for i, row in enumerate(data_rows, start=2):
         continue
 
     try:
-        data = yf.download(ticker, period="1d", interval="5m", progress=False)
+        data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
     except:
         invalid_tickers.append(ticker)
         continue
@@ -125,7 +125,10 @@ for i, row in enumerate(data_rows, start=2):
     if data is None or data.empty:
         invalid_tickers.append(ticker)
         continue
-
+     # FIX: flatten multi-level columns
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+    
     # ================= INDICATORS =================
     data['RSI'] = calculate_rsi(data)
     data['EMA50'] = data['Close'].ewm(span=50).mean()
@@ -161,7 +164,8 @@ for i, row in enumerate(data_rows, start=2):
     minus_di = 100 * (minus_dm.rolling(14).mean() / atr)
     
     # ADX
-    dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
+    dx = ((plus_di - minus_di).abs() / (plus_di + minus_di)) * 100
+    dx = dx.squeeze()
     data['ADX'] = dx.rolling(14).mean()
 
     price = data['Close'].iloc[-1].item()
