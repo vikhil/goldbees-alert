@@ -134,7 +134,8 @@ for i, row in enumerate(data_rows, start=2):
             print(f"Yahoo error for {ticker}: {e}")
             invalid_tickers.append(ticker)
             continue
-    
+    except:
+            continue
         # ================= INDICATORS =================
         data['RSI'] = calculate_rsi(data)
         data['EMA50'] = data['Close'].ewm(span=50).mean()
@@ -185,8 +186,8 @@ for i, row in enumerate(data_rows, start=2):
         adx_val = data['ADX'].iloc[-1]
         adx = float(adx_val) if pd.notna(adx_val) else 0
 
-    # ================= SCORE =================
-    score = 0
+        # ================= SCORE =================
+        score = 0
     if rsi > 60: score += 2
     elif rsi > 50: score += 1
 
