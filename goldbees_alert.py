@@ -125,14 +125,14 @@ for i, row in enumerate(data_rows, start=2):
     #        invalid_tickers.append(ticker)
     #        continue
 
-        if data is None or data.empty:
-            invalid_tickers.append(ticker)
-            continue
+            if data is None or data.empty:
+                invalid_tickers.append(ticker)
+                continue
 
-    except Exception as e:
-            print(f"Yahoo error for {ticker}: {e}")
-            invalid_tickers.append(ticker)
-            continue
+        except Exception as e:
+                print(f"Yahoo error for {ticker}: {e}")
+                invalid_tickers.append(ticker)
+                continue
     
      # FIX: flatten multi-level columns
     if isinstance(data.columns, pd.MultiIndex):
