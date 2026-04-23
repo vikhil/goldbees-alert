@@ -119,29 +119,34 @@ for i, row in enumerate(data_rows, start=2):
     # ===== NEW: VWAP =====
     data['VWAP'] = (data['Volume'] * (data['High'] + data['Low'] + data['Close']) / 3).cumsum() / data['Volume'].cumsum()
     
-    # ===== NEW: ADX (Trend Strength) =====
+    # ===== FIXED ADX (SAFE SINGLE COLUMN) =====
     high = data['High']
     low = data['Low']
     close = data['Close']
 
-    plus_dm = high.diff()
-    minus_dm = low.diff()
-    
-    plus_dm[plus_dm < 0] = 0
-    minus_dm[minus_dm > 0] = 0
-    
-    tr1 = high - low
-    tr2 = abs(high - close.shift())
-    tr3 = abs(low - close.shift())
-    
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    # True Range
+    tr = pd.concat([
+        high - low,
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs()
+    ], axis=1).max(axis=1)
+
     atr = tr.rolling(14).mean()
+
+    # Directional Movement
+    plus_dm = high.diff()
+    minus_dm = -low.diff()
+
+    plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0.0)
+    minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0.0)
     
+    # DI
     plus_di = 100 * (plus_dm.rolling(14).mean() / atr)
-    minus_di = abs(100 * (minus_dm.rolling(14).mean() / atr))
+    minus_di = 100 * (minus_dm.rolling(14).mean() / atr)
     
-    adx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
-    data['ADX'] = adx.rolling(14).mean()
+    # ADX
+    dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
+    data['ADX'] = dx.rolling(14).mean()
 
     price = data['Close'].iloc[-1].item()
     rsi = data['RSI'].iloc[-1].item()
@@ -151,7 +156,7 @@ for i, row in enumerate(data_rows, start=2):
     vol_avg = data['VOL_AVG'].iloc[-1].item()
     recent_high = data['High'].rolling(20).max().iloc[-2].item()
     vwap = data['VWAP'].iloc[-1].item()
-    adx = data['ADX'].iloc[-1].item()
+    adx = float(data['ADX'].iloc[-1]) if not pd.isna(data['ADX'].iloc[-1]) else 0    
     
     # ================= SCORE =================
     score = 0
