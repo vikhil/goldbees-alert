@@ -34,10 +34,14 @@ def send_msg(msg):
             "parse_mode": "Markdown"
         }, timeout=10)
 
-        print("Telegram response:", res.status_code, res.text)
+        print("Telegram response:", res.status_code)
+
+        if res.status_code != 200:
+            print("Telegram error:", res.text)
 
     except Exception as e:
-        print("Telegram error:", e)
+        print("Telegram exception:", e)
+
 # ===================== RSI =====================
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff()
@@ -98,12 +102,14 @@ total_value = 0
 
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
-    actual_row = i + 1  # FIX OFFSET
+    
+    try:
+        actual_row = i + 1  # FIX OFFSET
 
     ticker = format_ticker(row[0] if len(row) > 0 else "")
     if not ticker:
         updates.append({
-            "row": i,
+            "row": actual_row,
             "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", "", ""]
         })
         continue
@@ -116,13 +122,19 @@ for i, row in enumerate(data_rows, start=2):
 
     try:
         data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
-    except:
-        invalid_tickers.append(ticker)
-        continue
+#    except:
+#        invalid_tickers.append(ticker)
+#        continue
 
-    if data is None or data.empty:
-        invalid_tickers.append(ticker)
-        continue
+        if data is None or data.empty:
+            invalid_tickers.append(ticker)
+            continue
+
+    except Exception as e:
+            print(f"Yahoo error for {ticker}: {e}")
+            invalid_tickers.append(ticker)
+            continue
+    
      # FIX: flatten multi-level columns
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = data.columns.get_level_values(0)
@@ -339,7 +351,20 @@ for u in updates:
 
 if batch_data:
     print(f"Updating {len(batch_data)} rows in Google Sheet...")
-    sheet.batch_update(batch_data)
+
+    try:
+        sheet.batch_update([
+            {
+                "range": item["range"],
+                "values": item["values"]
+            }
+            for item in batch_data
+        ])
+
+        print("✅ Sheet update successful")
+
+    except Exception as e:
+        print("❌ Google Sheets batch update failed:", e)
 
 # ===================== SUMMARY =====================
 if total_invested > 0:
@@ -352,4 +377,7 @@ if invalid_tickers:
 if not messages:
     messages.append("No strong signals right now 📊")
 
-send_msg("🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages))
+try:
+    send_msg("🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages))
+except Exception as e:
+    print("Final Telegram send failed:", e)
