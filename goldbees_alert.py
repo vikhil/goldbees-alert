@@ -104,13 +104,13 @@ for i, row in enumerate(data_rows, start=2):
         continue
 
     try:
-        data = yf.download(list_of_tickers, period="1d", interval="5m", progress=False)
+        data = yf.download(tickers, period="1d", interval="5m", progress=False)
     except:
         invalid_tickers.append(ticker)
         continue
 
     if data is None or data.empty:
-        invalid_tickers.append(f"{ticker} (no data)")
+        invalid_tickers.append(ticker)
         continue
 
     # ================= INDICATORS =================
