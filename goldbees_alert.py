@@ -131,9 +131,9 @@ for i, row in enumerate(data_rows, start=2):
                 data.columns = data.columns.get_level_values(0)
 
         except Exception as e:
-                print(f"Yahoo error for {ticker}: {e}")
-                invalid_tickers.append(ticker)
-                continue
+            print(f"Yahoo error for {ticker}: {e}")
+            invalid_tickers.append(ticker)
+            continue
     
     # ================= INDICATORS =================
     data['RSI'] = calculate_rsi(data)
