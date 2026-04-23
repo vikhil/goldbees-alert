@@ -23,7 +23,7 @@ PROFIT_POOL = BASE_CAPITAL * 0.2
 # ===================== TELEGRAM =====================
 def send_msg(msg):
     if not TOKEN or not CHAT_ID:
-        print("❌ Missing Telegram TOKEN or CHAT_ID")
+        print("Missing Telegram credentials")
         return
 
     try:
@@ -34,12 +34,10 @@ def send_msg(msg):
             "parse_mode": "Markdown"
         }, timeout=10)
 
-        print("Telegram response:", res.status_code)
-        print(res.text)
+        print("Telegram response:", res.status_code, res.text)
 
     except Exception as e:
         print("Telegram error:", e)
-
 # ===================== RSI =====================
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff()
@@ -224,7 +222,8 @@ for i, row in enumerate(data_rows, start=2):
         target = price * 1.02
 
     stop_loss = buy_price * 0.98
-
+    trail_stop = price * 0.97
+    
     # ================= CONFIDENCE =================
     if price > ema50 and rsi > 60 and volume > vol_avg:
         confidence = "⭐⭐⭐"
@@ -250,8 +249,11 @@ for i, row in enumerate(data_rows, start=2):
             decision = "BUY ON DIP 🟢"
         else:
             decision = "HOLD ⏳"
-    elif pl_percent >= 10 or (rsi > 70 and price < ema20):
-        decision = "BOOK PROFIT 💰"
+        elif pl_percent >= 10:
+            decision = "BOOK PROFIT 💰"
+
+        elif price < trail_stop and pl_percent > 5:
+            decision = "TRAIL STOP EXIT 🔻"
 
     # ================= ALLOCATION =================
     if "BREAKOUT" in decision:
@@ -292,7 +294,7 @@ for i, row in enumerate(data_rows, start=2):
     })
 
     # ================= TELEGRAM =================
-    if "BUY" in decision or "PROFIT" in decision:
+    if ("BUY" in decision or "PROFIT" in decision) and rank in ["🔥 Strong Buy", "👍 Good"]:
         messages.append(
             f"📊 *{ticker}*\n"
             f"P/L: {round(pl_percent,2)}%\n"
@@ -335,6 +337,7 @@ for u in updates:
     })
 
 if batch_data:
+    print(f"Updating {len(batch_data)} rows in Google Sheet...")
     sheet.batch_update(batch_data)
 
 # ===================== SUMMARY =====================
