@@ -105,26 +105,25 @@ for i, row in enumerate(data_rows, start=2):
     
     try:
         actual_row = i + 1  # FIX OFFSET
+        ticker = format_ticker(row[0] if len(row) > 0 else "")
+        if not ticker:
+            updates.append({
+                "row": actual_row,
+                "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", "", ""]
+            })
+            continue
 
-    ticker = format_ticker(row[0] if len(row) > 0 else "")
-    if not ticker:
-        updates.append({
-            "row": actual_row,
-            "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", "", ""]
-        })
-        continue
+        try:
+            qty = float(row[1])
+            buy_price = float(row[2])
+        except:
+            continue
 
-    try:
-        qty = float(row[1])
-        buy_price = float(row[2])
-    except:
-        continue
-
-    try:
-        data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
-#    except:
-#        invalid_tickers.append(ticker)
-#        continue
+        try:
+            data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
+    #    except:
+    #        invalid_tickers.append(ticker)
+    #        continue
 
         if data is None or data.empty:
             invalid_tickers.append(ticker)
