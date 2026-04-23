@@ -303,6 +303,8 @@ for i, row in enumerate(data_rows, start=2):
 print("Updates count:", len(updates))
 print("Messages count:", len(messages))
 
+print("Sending batch update to Google Sheets...")
+
 # ===================== GOOGLE SHEETS (ROW SAFE BATCH UPDATE) =====================
 
 batch_data = []
@@ -327,8 +329,10 @@ for u in updates:
 
 # Push everything in ONE API call
 for u in updates:
-    cell_range = f"D{u['row']}:O{u['row']}"
-    sheet.update(cell_range, [u["data"]])
+    batch_data.append({
+        "range": f"D{u['row']}:O{u['row']}",
+        "values": [u["data"]]
+    })
 
 if batch_data:
     sheet.batch_update(batch_data)
