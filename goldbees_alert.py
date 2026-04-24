@@ -112,12 +112,18 @@ for i, row in enumerate(data_rows, start=2):
                 "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", "", ""]
             })
             continue
-
+        
+        # Handle empty qty/buy price gracefully
         try:
             qty = float(row[1])
+        except:
+            qty = 0
+
+        try:
             buy_price = float(row[2])
         except:
-            continue
+            buy_price = 0
+            
         # ================= YAHOO DATA =================
         try:
             data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
@@ -218,7 +224,10 @@ for i, row in enumerate(data_rows, start=2):
             rank = "❌ Avoid"
 
         # ================= P/L =================
-        pl_percent = ((price - buy_price) / buy_price) * 100
+        if buy_price > 0:
+            pl_percent = ((price - buy_price) / buy_price) * 100
+        else:
+            pl_percent = 0
 
         total_invested += qty * buy_price
         total_value += qty * price
@@ -286,6 +295,7 @@ for i, row in enumerate(data_rows, start=2):
             buy_qty = 0
 
         # ================= STORE ROW =================
+        status = "HOLDING" if qty > 0 else "WATCHLIST"
         updates.append({
             "row": i,
             "data": [
@@ -332,6 +342,7 @@ full_data = sheet.get_all_values(value_render_option="UNFORMATTED_VALUE")
 
 # Ensure enough columns exist
 required_cols = 14  # A to N
+# required_cols = 16  # A to P
 for r in range(len(full_data)):
     if len(full_data[r]) < required_cols:
         full_data[r].extend([""] * (required_cols - len(full_data[r])))
@@ -346,7 +357,7 @@ for u in updates:
 # Push everything in ONE API call
 for u in updates:
     batch_data.append({
-        "range": f"D{u['row']}:O{u['row']}",
+        "range": f"D{u['row']}:P{u['row']}",
         "values": [u["data"]]
     })
 
