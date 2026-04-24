@@ -295,7 +295,7 @@ for i, row in enumerate(data_rows, start=2):
             buy_qty = 0
 
         # ================= STORE ROW =================
-        status = "HOLDING" if qty > 0 else "WATCHLIST"
+        # status = "HOLDING" if qty > 0 else "WATCHLIST"
         updates.append({
             "row": i,
             "data": [
@@ -357,7 +357,7 @@ for u in updates:
 # Push everything in ONE API call
 for u in updates:
     batch_data.append({
-        "range": f"D{u['row']}:P{u['row']}",
+        "range": f"D{u['row']}:O{u['row']}",
         "values": [u["data"]]
     })
 
