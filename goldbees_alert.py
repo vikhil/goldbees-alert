@@ -134,8 +134,7 @@ for i, row in enumerate(data_rows, start=2):
             print(f"Yahoo error for {ticker}: {e}")
             invalid_tickers.append(ticker)
             continue
-    except:
-            continue
+    
         # ================= INDICATORS =================
         data['RSI'] = calculate_rsi(data)
         data['EMA50'] = data['Close'].ewm(span=50).mean()
@@ -174,7 +173,8 @@ for i, row in enumerate(data_rows, start=2):
         dx = ((plus_di - minus_di).abs() / (plus_di + minus_di)) * 100
         dx = dx.squeeze()
         data['ADX'] = dx.rolling(14).mean()
-    
+        
+        # ================= VALUES =================
         price = data['Close'].iloc[-1].item()
         rsi = data['RSI'].iloc[-1].item()
         ema50 = data['EMA50'].iloc[-1].item()
@@ -183,134 +183,138 @@ for i, row in enumerate(data_rows, start=2):
         vol_avg = data['VOL_AVG'].iloc[-1].item()
         recent_high = data['High'].rolling(20).max().iloc[-2].item()
         vwap = data['VWAP'].iloc[-1].item()  
+        
         adx_val = data['ADX'].iloc[-1]
         adx = float(adx_val) if pd.notna(adx_val) else 0
 
         # ================= SCORE =================
         score = 0
-    if rsi > 60: score += 2
-    elif rsi > 50: score += 1
+        if rsi > 60: score += 2
+        elif rsi > 50: score += 1
 
-    if price > ema50: score += 2
-    elif price > ema20: score += 1
+        if price > ema50: score += 2
+        elif price > ema20: score += 1
 
-    if volume > vol_avg: score += 2
-    if price > recent_high: score += 3
+        if volume > vol_avg: score += 2
+        if price > recent_high: score += 3
 
-    # ===== SMART FILTERS =====
-    if price > vwap:
-        score += 1   # intraday strength
+        # ===== SMART FILTERS =====
+        if price > vwap:
+            score += 1   # intraday strength
     
-    if adx > 25:
-        score += 2   # strong trend
-    elif adx > 20:
-        score += 1
+        if adx > 25:
+            score += 2   # strong trend
+        elif adx > 20:
+            score += 1
     
-    # ===== FINAL RANK =====
-    if score >= 7:
-        rank = "🔥 Strong Buy"
-    elif score >= 5:
-        rank = "👍 Good"
-    elif score >= 3:
-        rank = "⚠️ Weak"
-    else:
-        rank = "❌ Avoid"
-
-    # ================= P/L =================
-    pl_percent = ((price - buy_price) / buy_price) * 100
-
-    total_invested += qty * buy_price
-    total_value += qty * price
-
-    # ================= TARGET / SL =================
-    if price > ema50 and rsi > 60:
-        target = price * 1.06
-    elif price > ema50:
-        target = price * 1.04
-    else:
-        target = price * 1.02
-
-    stop_loss = buy_price * 0.98
-    trail_stop = price * 0.97
-    
-    # ================= CONFIDENCE =================
-    if price > ema50 and rsi > 60 and volume > vol_avg:
-        confidence = "⭐⭐⭐"
-    elif price > ema50:
-        confidence = "⭐⭐"
-    else:
-        confidence = "⭐"
-
-    # ================= DECISION =================
-    decision = "HOLD"
-
-    if market_trend == "BEARISH":
-        decision = "⛔ NO TRADE (Market Weak)"
-        if pl_percent >= 10:
-            decision = "BOOK PROFIT 💰"
-
-    if price > recent_high and volume > vol_avg and adx > 20:
-        decision = "BUY BREAKOUT 🚀"
-    elif pl_percent < 0:
-        if price < ema50 and rsi < 35:
-            decision = "AVOID ADD ❌"
-        elif price > ema50 and rsi > 45 and price > vwap:
-            decision = "BUY ON DIP 🟢"
+        # ===== FINAL RANK =====
+        if score >= 7:
+            rank = "🔥 Strong Buy"
+        elif score >= 5:
+            rank = "👍 Good"
+        elif score >= 3:
+            rank = "⚠️ Weak"
         else:
-            decision = "HOLD ⏳"
+            rank = "❌ Avoid"
+
+        # ================= P/L =================
+        pl_percent = ((price - buy_price) / buy_price) * 100
+
+        total_invested += qty * buy_price
+        total_value += qty * price
+
+        # ================= TARGET / SL =================
+        if price > ema50 and rsi > 60:
+            target = price * 1.06
+        elif price > ema50:
+            target = price * 1.04
+        else:
+            target = price * 1.02
+
+        stop_loss = buy_price * 0.98
+        trail_stop = price * 0.97
     
-    elif pl_percent >= 10:
-        decision = "BOOK PROFIT 💰"
+        # ================= CONFIDENCE =================
+        if price > ema50 and rsi > 60 and volume > vol_avg:
+            confidence = "⭐⭐⭐"
+        elif price > ema50:
+            confidence = "⭐⭐"
+        else:
+            confidence = "⭐"
 
-    elif price < trail_stop and pl_percent > 5:
-        decision = "TRAIL STOP EXIT 🔻"
+        # ================= DECISION =================
+        decision = "HOLD"
+    
+        if market_trend == "BEARISH":
+            decision = "⛔ NO TRADE (Market Weak)"
+            if pl_percent >= 10:
+                decision = "BOOK PROFIT 💰"
+    
+        if price > recent_high and volume > vol_avg and adx > 20:
+            decision = "BUY BREAKOUT 🚀"
+        elif pl_percent < 0:
+            if price < ema50 and rsi < 35:
+                decision = "AVOID ADD ❌"
+            elif price > ema50 and rsi > 45 and price > vwap:
+                decision = "BUY ON DIP 🟢"
+            else:
+                decision = "HOLD ⏳"
+        
+        elif pl_percent >= 10:
+            decision = "BOOK PROFIT 💰"
+    
+        elif price < trail_stop and pl_percent > 5:
+            decision = "TRAIL STOP EXIT 🔻"
 
-    # ================= ALLOCATION =================
-    if "BREAKOUT" in decision:
-        allocation_pct = 0.20
-    elif "Strong" in rank:
-        allocation_pct = 0.15
-    elif "BUY ON DIP" in decision:
-        allocation_pct = 0.10
-    else:
-        allocation_pct = 0.0
+        # ================= ALLOCATION =================
+        if "BREAKOUT" in decision:
+            allocation_pct = 0.20
+        elif "Strong" in rank:
+            allocation_pct = 0.15
+        elif "BUY ON DIP" in decision:
+            allocation_pct = 0.10
+        else:
+            allocation_pct = 0.0
+    
+        if pl_percent < -15:
+            allocation_pct += 0.05
+    
+        buy_amount = PROFIT_POOL * allocation_pct
+        buy_qty = int(buy_amount / price) if price > 0 else 0
+    
+        if "AVOID" in decision:
+            buy_qty = 0
 
-    if pl_percent < -15:
-        allocation_pct += 0.05
+        # ================= STORE ROW =================
+        updates.append({
+            "row": i,
+            "data": [
+                current_time,
+                round(target, 2),
+                round(stop_loss, 2),
+                rank,
+                confidence,
+                round(price, 2),
+                round(rsi, 2),
+                round(ema50, 2),
+                round(pl_percent, 2),
+                decision,
+                f"{int(allocation_pct*100)}%",
+                buy_qty
+            ]
+        })
 
-    buy_amount = PROFIT_POOL * allocation_pct
-    buy_qty = int(buy_amount / price) if price > 0 else 0
-
-    if "AVOID" in decision:
-        buy_qty = 0
-
-    # ================= STORE ROW =================
-    updates.append({
-        "row": i,
-        "data": [
-            current_time,
-            round(target, 2),
-            round(stop_loss, 2),
-            rank,
-            confidence,
-            round(price, 2),
-            round(rsi, 2),
-            round(ema50, 2),
-            round(pl_percent, 2),
-            decision,
-            f"{int(allocation_pct*100)}%",
-            buy_qty
-        ]
-    })
-
-    # ================= TELEGRAM =================
-    if ("BUY" in decision or "PROFIT" in decision) and rank in ["🔥 Strong Buy", "👍 Good"]:
-        messages.append(
-            f"📊 *{ticker}*\n"
-            f"P/L: {round(pl_percent,2)}%\n"
-            f"👉 {decision}\n"
-            f"⭐ {rank}"
-        )
+        # ================= TELEGRAM =================
+        if ("BUY" in decision or "PROFIT" in decision) and rank in ["🔥 Strong Buy", "👍 Good"]:
+            messages.append(
+                f"📊 *{ticker}*\n"
+                f"P/L: {round(pl_percent,2)}%\n"
+                f"👉 {decision}\n"
+                f"⭐ {rank}"
+            )
+    except Exception as e:
+        print(f"Main loop error at row {i}: {e}")
+        continue
 
 print("Updates count:", len(updates))
 print("Messages count:", len(messages))
