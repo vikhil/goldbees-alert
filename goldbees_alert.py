@@ -141,7 +141,7 @@ total_value = 0
 for i, row in enumerate(data_rows, start=2):
     
     try:
-        actual_row = i if i >= 2 else 2
+        actual_row = i
         ticker = format_ticker(row[0] if len(row) > 0 else "")
         if not ticker:
             updates.append({
@@ -149,20 +149,32 @@ for i, row in enumerate(data_rows, start=2):
                 "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", "", ""]
             })
             continue
-        
-        
 
         # ===================== APPLY COLORS =====================
+        from gspread_formatting import format_cell_ranges, CellFormat, Color
+        
         if format_requests:
             print(f"Applying colors to {len(format_requests)} rows...")
-
             try:
-                sheet.batch_format(format_requests)
+                formatted_ranges = []
+
+                for req in format_requests:
+                    r = req["range"]
+                    c = req["format"]["backgroundColor"]
+
+                    formatted_ranges.append((
+                        r,
+                        CellFormat(
+                            backgroundColor=Color(c["red"], c["green"], c["blue"])
+                        )
+                    ))
+
+                format_cell_ranges(sheet, formatted_ranges)
+
                 print("✅ Color formatting applied")
 
             except Exception as e:
                 print("❌ Color formatting failed:", e)
-        
         # ===================== Handle empty qty/buy price gracefully =====================
         try:
             qty = float(row[1]) if row[1] else 0
@@ -311,23 +323,25 @@ for i, row in enumerate(data_rows, start=2):
             decision = "⛔ NO TRADE (Market Weak)"
             if pl_percent >= 10:
                 decision = "BOOK PROFIT 💰"
-    
+        
         if price > recent_high and volume > vol_avg and adx > 20:
-            decision = "BUY BREAKOUT 🚀"
+            decision = "🚀 BUY BREAKOUT"
         elif pl_percent < 0:
             if price < ema50 and rsi < 35:
-                decision = "AVOID ADD ❌"
+                decision = "❌ AVOID ADD"
             elif price > ema50 and rsi > 45 and price > vwap:
-                decision = "BUY ON DIP 🟢"
+                decision = "🟢 BUY ON DIP"
             else:
-                decision = "HOLD ⏳"
-        
+                decision = "⏳ HOLD"
+                
         elif pl_percent >= 10:
-            decision = "BOOK PROFIT 💰"
-    
+            decision = "💰 BOOK PROFIT"
+            
         elif price < trail_stop and pl_percent > 5:
-            decision = "TRAIL STOP EXIT 🔻"
-
+            decision = "🔻 TRAIL STOP EXIT"
+        else:
+            decision = "⏳ HOLD"
+    
         print(ticker, "Score:", score, "RSI:", rsi, "ADX:", adx, "Decision:", decision)
 
         # ================= ALLOCATION =================
@@ -374,7 +388,7 @@ for i, row in enumerate(data_rows, start=2):
         row_color = get_color(decision)
 
         format_requests.append({
-            "range": f"A{actual_row}:O{actual_row}",
+            "range": f"M{actual_row}",
             "format": {
                 "backgroundColor": row_color
             }
