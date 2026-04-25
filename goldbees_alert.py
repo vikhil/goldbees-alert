@@ -128,7 +128,7 @@ total_value = 0
 for i, row in enumerate(data_rows, start=2):
     
     try:
-        actual_row = i + 1  # FIX OFFSET
+        actual_row = i if i >= 2 else 2
         ticker = format_ticker(row[0] if len(row) > 0 else "")
         if not ticker:
             updates.append({
@@ -364,11 +364,11 @@ print(f"Updates count: {len(updates)}")
 print(f"Messages count: {len(messages)}")
 
 # ✅ ADD HERE (Telegram fix)
-if messages:
-    message_text = "\n".join(messages)
-    send_msg(message_text)
-else:
-    print("No messages to send to Telegram")
+#if messages:
+ #   message_text = "\n".join(messages)
+  #  send_msg(message_text)
+#else:
+ #   print("No messages to send to Telegram")
 
 # --- GOOGLE SHEETS UPDATE ---    
 # print("Sending batch update to Google Sheets...")
