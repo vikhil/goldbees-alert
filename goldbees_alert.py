@@ -125,14 +125,11 @@ for i, row in enumerate(data_rows, start=2):
         
         # Handle empty qty/buy price gracefully
         try:
-            qty = float(row[1])
+            qty = float(row[1]) if row[1] else 0
+            buy_price = float(row[2]) if row[2] else price
         except:
             qty = 0
-
-        try:
-            buy_price = float(row[2])
-        except:
-            buy_price = 0
+            buy_price = price
             
         # ================= YAHOO DATA =================
         try:
@@ -187,7 +184,7 @@ for i, row in enumerate(data_rows, start=2):
         
         # ADX
         dx = ((plus_di - minus_di).abs() / (plus_di + minus_di)) * 100
-        dx = dx.squeeze()
+        # dx = dx.squeeze()
         data['ADX'] = dx.rolling(14).mean()
         
         # ================= VALUES =================
@@ -204,6 +201,11 @@ for i, row in enumerate(data_rows, start=2):
        # adx = float(adx_val) if pd.notna(adx_val) else 0
         adx = safe_float(data['ADX'].iloc[-1])
 
+        # ✅ ADD THIS BLOCK HERE
+        if pd.isna(price) or pd.isna(rsi) or pd.isna(adx):
+            print(f"Skipping {ticker} due to NaN values")
+            continue
+        
         # ================= SCORE =================
         score = 0
         if rsi > 60: score += 2
@@ -311,7 +313,7 @@ for i, row in enumerate(data_rows, start=2):
         # status = "HOLDING" if qty > 0 else "WATCHLIST"
         safe_round = lambda x: round(safe_float(x), 2)
         updates.append({
-            "row": i,
+            "row": actual_row,
             "data": [
                 current_time,
                 safe_round(target, 2),
