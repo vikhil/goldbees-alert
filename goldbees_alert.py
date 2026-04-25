@@ -35,7 +35,7 @@ BASE_CAPITAL = 100000
 PROFIT_POOL = BASE_CAPITAL * 0.2
 
 # ===================== TELEGRAM =====================
-def send_msg(msg):
+def send_msg(message_text):
     if not TOKEN or not CHAT_ID:
         print("Missing Telegram credentials")
         return
@@ -44,7 +44,7 @@ def send_msg(msg):
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
         res = requests.get(url, params={
             "chat_id": CHAT_ID,
-            "text": msg,
+            "text": message_text,
             "parse_mode": "Markdown"
         }, timeout=10)
 
@@ -65,15 +65,15 @@ def calculate_rsi(data, period=14):
     return 100 - (100 / (1 + rs))
 
 # ===================== SAFE FLOAT =====================
-def safe_float(val):
-    try:
-        if pd.isna(val):
-            return 0
-        if val == float("inf") or val == float("-inf"):
-            return 0
-        return float(val)
-    except:
-        return 0
+#def safe_float(val):
+ #   try:
+  #      if pd.isna(val):
+   #         return 0
+    #    if val == float("inf") or val == float("-inf"):
+     #       return 0
+      #  return float(val)
+    #except:
+     #   return 0
 # ===================== TICKER CLEANER =====================
 def format_ticker(ticker):
     ticker = str(ticker).strip().upper()
@@ -358,10 +358,21 @@ for i, row in enumerate(data_rows, start=2):
         print(f"Main loop error at row {i}: {e}")
         continue
 
-print("Updates count:", len(updates))
-print("Messages count:", len(messages))
+# print("Updates count:", len(updates))
+# print("Messages count:", len(messages))
+print(f"Updates count: {len(updates)}")
+print(f"Messages count: {len(messages)}")
 
-print("Sending batch update to Google Sheets...")
+# ✅ ADD HERE (Telegram fix)
+if messages:
+    message_text = "\n".join(messages)
+    send_msg(message_text)
+else:
+    print("No messages to send to Telegram")
+
+# --- GOOGLE SHEETS UPDATE ---    
+# print("Sending batch update to Google Sheets...")
+# sheet.update(full_data)
 
 # ===================== GOOGLE SHEETS (ROW SAFE BATCH UPDATE) =====================
 
@@ -383,13 +394,21 @@ for r in range(len(full_data)):
 for u in updates:
     row_idx = u["row"] - 1  # zero-based index
 
+    # ✅ Ensure row exists
+    while len(full_data) <= row_idx:
+        full_data.append([""] * required_cols)
+        
     for col_offset, value in enumerate(u["data"]):
-        required_length = 3 + col_offset + 1
-
-        while len(full_data[row_idx]) < required_length:
+    # required_length = 3 + col_offset + 1
+        col_idx = 3 + col_offset  # Column D = index 3
+        
+        # ✅ Ensure row has enough columns
+        while len(full_data[row_idx]) <= col_idx:
             full_data[row_idx].append("")
         
-        full_data[row_idx][3 + col_offset] = value   # Column D = index 3
+        # ✅ Assign value
+        # full_data[row_idx][3 + col_offset] = value   # Column D = index 3
+        full_data[row_idx][col_idx] = value
 
 # Push everything in ONE API call
 for u in updates:
