@@ -7,7 +7,19 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 from datetime import datetime
 import pytz
+import math
 
+def safe_float(x):
+    try:
+        if x is None or (isinstance(x, float) and math.isnan(x)):
+            return 0.0
+        return float(x)
+    except:
+        return 0.0
+
+def safe_round(x):
+    return round(safe_float(x), 2)
+    
 round = __builtins__.round
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -319,14 +331,14 @@ for i, row in enumerate(data_rows, start=2):
             "row": actual_row,
             "data": [
                 current_time,
-                safe_round(target, 2),
-                safe_round(stop_loss, 2),
+                safe_round(target),
+                safe_round(stop_loss),
                 rank,
                 confidence,
-                safe_round(price, 2),
-                safe_round(rsi, 2),
-                safe_round(ema50, 2),
-                safe_round(pl_percent, 2),
+                safe_round(price),
+                safe_round(rsi),
+                safe_round(ema50),
+                safe_round(pl_percent),
                 decision,
                 f"{int(allocation_pct*100)}%",
                 buy_qty
