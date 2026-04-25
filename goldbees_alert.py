@@ -8,6 +8,8 @@ import json
 from datetime import datetime
 import pytz
 
+round = __builtins__.round
+
 IST = pytz.timezone("Asia/Kolkata")
 current_time = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -311,7 +313,8 @@ for i, row in enumerate(data_rows, start=2):
 
         # ================= STORE ROW =================
         # status = "HOLDING" if qty > 0 else "WATCHLIST"
-        safe_round = lambda x: round(safe_float(x), 2)
+        # safe_round = lambda x: round(safe_float(x), 2)
+        print("CHECK ROUND:", round(10.456, 2))
         updates.append({
             "row": actual_row,
             "data": [
@@ -331,7 +334,8 @@ for i, row in enumerate(data_rows, start=2):
         })
 
         # ================= TELEGRAM =================
-        if ("BUY" in decision or "PROFIT" in decision) and rank in ["🔥 Strong Buy", "👍 Good"]:
+        # if ("BUY" in decision or "PROFIT" in decision) and rank in ["🔥 Strong Buy", "👍 Good"]:
+        if "BUY" in decision or "PROFIT" in decision:
             messages.append(
                 f"📊 *{ticker}*\n"
                 f"P/L: {round(pl_percent,2)}%\n"
