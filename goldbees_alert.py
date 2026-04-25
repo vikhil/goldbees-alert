@@ -150,15 +150,7 @@ for i, row in enumerate(data_rows, start=2):
             })
             continue
         
-        # ===================== COLOR TRACK =====================
-        row_color = get_color(decision)
-
-        format_requests.append({
-            "range": f"A{actual_row}:O{actual_row}",
-            "format": {
-                "backgroundColor": row_color
-            }
-        })
+        
 
         # ===================== APPLY COLORS =====================
         if format_requests:
@@ -378,7 +370,15 @@ for i, row in enumerate(data_rows, start=2):
                 buy_qty
             ]
         })
+        # ===================== COLOR TRACK =====================
+        row_color = get_color(decision)
 
+        format_requests.append({
+            "range": f"A{actual_row}:O{actual_row}",
+            "format": {
+                "backgroundColor": row_color
+            }
+        })
         # ================= TELEGRAM =================
         # if ("BUY" in decision or "PROFIT" in decision) and rank in ["🔥 Strong Buy", "👍 Good"]:
         if "BUY" in decision or "PROFIT" in decision:
