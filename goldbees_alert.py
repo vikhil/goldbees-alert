@@ -34,6 +34,17 @@ print("CHAT_ID:", CHAT_ID)
 BASE_CAPITAL = 100000
 PROFIT_POOL = BASE_CAPITAL * 0.2
 
+# ===================== COLOR FUNCTION =====================
+def get_color(decision):
+    if "BUY" in decision or "BREAKOUT" in decision:
+        return {"red": 0.8, "green": 1, "blue": 0.8}   # Light Green
+    elif "PROFIT" in decision or "EXIT" in decision:
+        return {"red": 1, "green": 0.8, "blue": 0.8}   # Light Red
+    elif "HOLD" in decision:
+        return {"red": 1, "green": 1, "blue": 0.6}     # Yellow
+    else:
+        return {"red": 0.9, "green": 0.9, "blue": 0.9} # Grey
+        
 # ===================== TELEGRAM =====================
 def send_msg(message_text):
     if not TOKEN or not CHAT_ID:
@@ -119,6 +130,8 @@ messages = []
 updates = []
 invalid_tickers = []
 
+format_requests = []
+
 print("Script started")
 
 total_invested = 0
@@ -137,7 +150,28 @@ for i, row in enumerate(data_rows, start=2):
             })
             continue
         
-        # Handle empty qty/buy price gracefully
+        # ===================== COLOR TRACK =====================
+        row_color = get_color(decision)
+
+        format_requests.append({
+            "range": f"A{actual_row}:O{actual_row}",
+            "format": {
+                "backgroundColor": row_color
+            }
+        })
+
+        # ===================== APPLY COLORS =====================
+        if format_requests:
+            print(f"Applying colors to {len(format_requests)} rows...")
+
+            try:
+                sheet.batch_format(format_requests)
+                print("✅ Color formatting applied")
+
+            except Exception as e:
+                print("❌ Color formatting failed:", e)
+        
+        # ===================== Handle empty qty/buy price gracefully =====================
         try:
             qty = float(row[1]) if row[1] else 0
             buy_price = float(row[2]) if row[2] else price
