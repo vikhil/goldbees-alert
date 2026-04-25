@@ -50,6 +50,16 @@ def calculate_rsi(data, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
+# ===================== SAFE FLOAT =====================
+def safe_float(val):
+    try:
+        if pd.isna(val):
+            return 0
+        if val == float("inf") or val == float("-inf"):
+            return 0
+        return float(val)
+    except:
+        return 0
 # ===================== TICKER CLEANER =====================
 def format_ticker(ticker):
     ticker = str(ticker).strip().upper()
@@ -182,16 +192,17 @@ for i, row in enumerate(data_rows, start=2):
         
         # ================= VALUES =================
         price = data['Close'].iloc[-1].item()
-        rsi = data['RSI'].iloc[-1].item()
-        ema50 = data['EMA50'].iloc[-1].item()
-        ema20 = data['EMA20'].iloc[-1].item()
-        volume = data['Volume'].iloc[-1].item()
-        vol_avg = data['VOL_AVG'].iloc[-1].item()
+        rsi = safe_float(data['RSI'].iloc[-1])
+        ema50 = safe_float(data['EMA50'].iloc[-1])
+        ema20 = safe_float(data['EMA20'].iloc[-1])
+        volume = safe_float(data['Volume'].iloc[-1])
+        vol_avg = safe_float(data['VOL_AVG'].iloc[-1])
         recent_high = data['High'].rolling(20).max().iloc[-2].item()
-        vwap = data['VWAP'].iloc[-1].item()  
+        vwap = safe_float(data['VWAP'].iloc[-1])  
         
         adx_val = data['ADX'].iloc[-1]
-        adx = float(adx_val) if pd.notna(adx_val) else 0
+       # adx = float(adx_val) if pd.notna(adx_val) else 0
+        adx = safe_float(data['ADX'].iloc[-1])
 
         # ================= SCORE =================
         score = 0
@@ -275,6 +286,8 @@ for i, row in enumerate(data_rows, start=2):
         elif price < trail_stop and pl_percent > 5:
             decision = "TRAIL STOP EXIT 🔻"
 
+        print(ticker, "Score:", score, "RSI:", rsi, "ADX:", adx, "Decision:", decision)
+
         # ================= ALLOCATION =================
         if "BREAKOUT" in decision:
             allocation_pct = 0.20
@@ -296,18 +309,19 @@ for i, row in enumerate(data_rows, start=2):
 
         # ================= STORE ROW =================
         # status = "HOLDING" if qty > 0 else "WATCHLIST"
+        safe_round = lambda x: round(safe_float(x), 2)
         updates.append({
             "row": i,
             "data": [
                 current_time,
-                round(target, 2),
-                round(stop_loss, 2),
+                safe_round(target, 2),
+                safe_round(stop_loss, 2),
                 rank,
                 confidence,
-                round(price, 2),
-                round(rsi, 2),
-                round(ema50, 2),
-                round(pl_percent, 2),
+                safe_round(price, 2),
+                safe_round(rsi, 2),
+                safe_round(ema50, 2),
+                safe_round(pl_percent, 2),
                 decision,
                 f"{int(allocation_pct*100)}%",
                 buy_qty
@@ -358,7 +372,8 @@ for u in updates:
 for u in updates:
     batch_data.append({
         "range": f"D{u['row']}:O{u['row']}",
-        "values": [u["data"]]
+# "values": [u["data"]]
+        "values": [[safe_float(x) if isinstance(x, (int, float)) else x for x in u["data"]]]
     })
 
 if batch_data:
