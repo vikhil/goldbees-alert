@@ -384,6 +384,11 @@ for u in updates:
     row_idx = u["row"] - 1  # zero-based index
 
     for col_offset, value in enumerate(u["data"]):
+        required_length = 3 + col_offset + 1
+
+        while len(full_data[row_idx]) < required_length:
+            full_data[row_idx].append("")
+        
         full_data[row_idx][3 + col_offset] = value   # Column D = index 3
 
 # Push everything in ONE API call
