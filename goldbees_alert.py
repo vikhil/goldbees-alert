@@ -7,6 +7,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 from datetime import datetime
 import pytz
+from gspread_formatting import format_cell_ranges, CellFormat, Color
 import math
 
 def safe_float(x):
@@ -151,7 +152,7 @@ for i, row in enumerate(data_rows, start=2):
             continue
 
         # ===================== APPLY COLORS =====================
-        from gspread_formatting import format_cell_ranges, CellFormat, Color
+        #from gspread_formatting import format_cell_ranges, CellFormat, Color
         
         if format_requests:
             print(f"Applying colors to {len(format_requests)} rows...")
