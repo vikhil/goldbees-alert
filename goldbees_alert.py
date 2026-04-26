@@ -395,23 +395,23 @@ if format_requests:
     try:
         formatted_ranges = []
 
-    for req in format_requests:
-        r = req["range"]
-        c = req["format"]["backgroundColor"]
+        for req in format_requests:
+            r = req["range"]
+            c = req["format"]["backgroundColor"]
 
-        formatted_ranges.append((
-            r,
-            CellFormat(
-                backgroundColor=Color(c["red"], c["green"], c["blue"])
-            )
-        ))
+            formatted_ranges.append((
+                r,
+                CellFormat(
+                    backgroundColor=Color(c["red"], c["green"], c["blue"])
+                )
+            ))
 
-    format_cell_ranges(sheet, formatted_ranges)
+        format_cell_ranges(sheet, formatted_ranges)
 
-    print("✅ Color formatting applied")
+        print("✅ Color formatting applied")
 
-except Exception as e:
-    print("❌ Color formatting failed:", e)
+    except Exception as e:
+        print("❌ Color formatting failed:", e)
 
 # ✅ ADD HERE (Telegram fix)
 #if messages:
