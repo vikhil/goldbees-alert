@@ -57,24 +57,6 @@ SECTOR_MAP = {
     "RVNL.NS": "INFRA",
 }
 
-sector_summary = []
-
-for sector, data in sector_data.items():
-    avg_pl = data["total_pl"] / data["count"] if data["count"] > 0 else 0
-
-    if avg_pl > 3:
-        status = "🔥 Strong"
-    elif avg_pl > 0:
-        status = "👍 Positive"
-    elif avg_pl > -3:
-        status = "⚠️ Neutral"
-    else:
-        status = "🔻 Weak"
-
-    sector_summary.append((sector, avg_pl, status))
-
-sector_summary.sort(key=lambda x: x[1], reverse=True)
-
 # ===================== TELEGRAM =====================
 def send_msg(message_text):
     if not TOKEN or not CHAT_ID:
@@ -166,12 +148,12 @@ messages = []
 updates = []
 invalid_tickers = []
 
+sector_data = {}
+
 print("Script started")
 
 total_invested = 0
 total_value = 0
-
-sector_data = {}
 
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
@@ -304,10 +286,7 @@ for i, row in enumerate(data_rows, start=2):
             pl_percent = ((price - buy_price) / buy_price) * 100
         else:
             pl_percent = 0
-
-        total_invested += qty * buy_price
-        total_value += qty * price
-
+        # ================= SECTOR TRACKING =================
         sector = SECTOR_MAP.get(ticker, "OTHERS")
 
         if sector not in sector_data:
@@ -318,6 +297,10 @@ for i, row in enumerate(data_rows, start=2):
 
         sector_data[sector]["total_pl"] += pl_percent
         sector_data[sector]["count"] += 1
+
+        total_invested += qty * buy_price
+        total_value += qty * price
+
         # ================= TARGET / SL =================
         if price > ema50 and rsi > 60:
             target = price * 1.06
@@ -425,6 +408,24 @@ for i, row in enumerate(data_rows, start=2):
 print(f"Updates count: {len(updates)}")
 print(f"Messages count: {len(messages)}")
 
+sector_summary = []
+
+for sector, data in sector_data.items():
+    avg_pl = data["total_pl"] / data["count"] if data["count"] > 0 else 0
+
+    if avg_pl > 3:
+        status = "🔥 Strong"
+    elif avg_pl > 0:
+        status = "👍 Positive"
+    elif avg_pl > -3:
+        status = "⚠️ Neutral"
+    else:
+        status = "🔻 Weak"
+
+    sector_summary.append((sector, avg_pl, status))
+
+sector_summary.sort(key=lambda x: x[1], reverse=True)
+
 # ✅ ADD HERE (Telegram fix)
 #if messages:
  #   message_text = "\n".join(messages)
@@ -508,6 +509,18 @@ if invalid_tickers:
 if not messages:
     messages.append("No strong signals right now 📊")
 
+# ===================== TELEGRAM SECTOR SUMMARY =====================
+
+sector_msg = "\n📊 *Sector Summary:*\n"
+
+if sector_summary:
+    for sec, pl, status in sector_summary:
+        sector_msg += f"{sec}: {round(pl,2)}% {status}\n"
+else:
+    sector_msg += "No sector data available\n"
+
+messages.append(sector_msg)
+# ===================== TELEGRAM =====================
 try:
     send_msg("🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages))
 except Exception as e:
