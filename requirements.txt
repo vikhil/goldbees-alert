@@ -1,0 +1,7 @@
+yfinance
+pandas
+gspread
+oauth2client
+requests
+pytz
+gspread-formatting
