@@ -149,6 +149,7 @@ updates = []
 invalid_tickers = []
 
 sector_data = {}
+sector_summary = []
 
 print("Script started")
 
