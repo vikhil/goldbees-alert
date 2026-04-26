@@ -34,7 +34,47 @@ print("CHAT_ID:", CHAT_ID)
 
 BASE_CAPITAL = 100000
 PROFIT_POOL = BASE_CAPITAL * 0.2
-        
+
+SECTOR_MAP = {
+    "ICICIBANK.NS": "BANKING",
+    "KOTAKBANK.NS": "BANKING",
+    "YESBANK.NS": "BANKING",
+    "SBIN.NS": "BANKING",
+
+    "TCS.NS": "IT",
+    "INFY.NS": "IT",
+
+    "NATCOPHARM.NS": "PHARMA",
+    "CIPLA.NS": "PHARMA",
+
+    "COALINDIA.NS": "ENERGY",
+    "NTPC.NS": "ENERGY",
+
+    "TITAN.NS": "CONSUMPTION",
+    "VBL.NS": "CONSUMPTION",
+
+    "ADANIENT.NS": "INFRA",
+    "RVNL.NS": "INFRA",
+}
+
+sector_summary = []
+
+for sector, data in sector_data.items():
+    avg_pl = data["total_pl"] / data["count"] if data["count"] > 0 else 0
+
+    if avg_pl > 3:
+        status = "🔥 Strong"
+    elif avg_pl > 0:
+        status = "👍 Positive"
+    elif avg_pl > -3:
+        status = "⚠️ Neutral"
+    else:
+        status = "🔻 Weak"
+
+    sector_summary.append((sector, avg_pl, status))
+
+sector_summary.sort(key=lambda x: x[1], reverse=True)
+
 # ===================== TELEGRAM =====================
 def send_msg(message_text):
     if not TOKEN or not CHAT_ID:
@@ -57,6 +97,12 @@ def send_msg(message_text):
     except Exception as e:
         print("Telegram exception:", e)
 
+sector_msg = "\n📊 *Sector Summary:*\n"
+
+for sec, pl, status in sector_summary:
+    sector_msg += f"{sec}: {round(pl,2)}% {status}\n"
+
+messages.append(sector_msg)
 # ===================== RSI =====================
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff()
@@ -124,6 +170,8 @@ print("Script started")
 
 total_invested = 0
 total_value = 0
+
+sector_data = {}
 
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
@@ -260,6 +308,16 @@ for i, row in enumerate(data_rows, start=2):
         total_invested += qty * buy_price
         total_value += qty * price
 
+        sector = SECTOR_MAP.get(ticker, "OTHERS")
+
+        if sector not in sector_data:
+            sector_data[sector] = {
+                "total_pl": 0,
+                "count": 0
+            }
+
+        sector_data[sector]["total_pl"] += pl_percent
+        sector_data[sector]["count"] += 1
         # ================= TARGET / SL =================
         if price > ema50 and rsi > 60:
             target = price * 1.06
@@ -345,7 +403,7 @@ for i, row in enumerate(data_rows, start=2):
                 decision,
                 f"{int(allocation_pct*100)}%",
                 buy_qty,
-                sector
+                #sector
             ]
         })
         
@@ -454,3 +512,5 @@ try:
     send_msg("🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages))
 except Exception as e:
     print("Final Telegram send failed:", e)
+
+
