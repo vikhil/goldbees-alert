@@ -79,12 +79,6 @@ def send_msg(message_text):
     except Exception as e:
         print("Telegram exception:", e)
 
-sector_msg = "\n📊 *Sector Summary:*\n"
-
-for sec, pl, status in sector_summary:
-    sector_msg += f"{sec}: {round(pl,2)}% {status}\n"
-
-messages.append(sector_msg)
 # ===================== RSI =====================
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff()
