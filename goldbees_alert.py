@@ -427,6 +427,18 @@ for sector, data in sector_data.items():
 
 sector_summary.sort(key=lambda x: x[1], reverse=True)
 
+# ===================== TELEGRAM SECTOR SUMMARY =====================
+
+sector_msg = "\n📊 *Sector Summary:*\n"
+
+if sector_summary:
+    for sec, pl, status in sector_summary:
+        sector_msg += f"{sec}: {round(pl,2)}% {status}\n"
+else:
+    sector_msg += "No sector data available\n"
+
+messages.append(sector_msg)
+
 # ✅ ADD HERE (Telegram fix)
 #if messages:
  #   message_text = "\n".join(messages)
@@ -510,21 +522,9 @@ if invalid_tickers:
 if not messages:
     messages.append("No strong signals right now 📊")
 
-# ===================== TELEGRAM SECTOR SUMMARY =====================
-
-sector_msg = "\n📊 *Sector Summary:*\n"
-
-if sector_summary:
-    for sec, pl, status in sector_summary:
-        sector_msg += f"{sec}: {round(pl,2)}% {status}\n"
-else:
-    sector_msg += "No sector data available\n"
-
-messages.append(sector_msg)
 # ===================== TELEGRAM =====================
 try:
     send_msg("🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages))
 except Exception as e:
     print("Final Telegram send failed:", e)
-
-
+    
