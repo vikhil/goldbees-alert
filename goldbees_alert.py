@@ -344,7 +344,8 @@ for i, row in enumerate(data_rows, start=2):
                 safe_round(pl_percent),
                 decision,
                 f"{int(allocation_pct*100)}%",
-                buy_qty
+                buy_qty,
+                sector
             ]
         })
         
@@ -387,7 +388,7 @@ batch_data = []
 full_data = sheet.get_all_values(value_render_option="UNFORMATTED_VALUE")
 
 # Ensure enough columns exist
-required_cols = 14  # A to N
+required_cols = 15  # A to N
 # required_cols = 16  # A to P
 for r in range(len(full_data)):
     if len(full_data[r]) < required_cols:
@@ -416,7 +417,7 @@ for u in updates:
 # Push everything in ONE API call
 for u in updates:
     batch_data.append({
-        "range": f"D{u['row']}:O{u['row']}",
+        "range": f"D{u['row']}:P{u['row']}",
 # "values": [u["data"]]
         "values": [[safe_float(x) if isinstance(x, (int, float)) else x for x in u["data"]]]
     })
