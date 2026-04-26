@@ -7,7 +7,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 from datetime import datetime
 import pytz
-from gspread_formatting import format_cell_ranges, CellFormat, Color
+#from gspread_formatting import format_cell_ranges, CellFormat, Color
 import math
 
 def safe_float(x):
@@ -36,15 +36,14 @@ BASE_CAPITAL = 100000
 PROFIT_POOL = BASE_CAPITAL * 0.2
 
 # ===================== COLOR FUNCTION =====================
-def get_color(decision):
-    if "BUY" in decision or "BREAKOUT" in decision:
-        return {"red": 0.8, "green": 1, "blue": 0.8}   # Light Green
-    elif "PROFIT" in decision or "EXIT" in decision:
-        return {"red": 1, "green": 0.8, "blue": 0.8}   # Light Red
-    elif "HOLD" in decision:
-        return {"red": 1, "green": 1, "blue": 0.6}     # Yellow
-    else:
-        return {"red": 0.9, "green": 0.9, "blue": 0.9} # Grey
+# def get_color(decision):
+#     if "BUY" in decision or "BREAKOUT" in decision:
+#         return {"red": 0.8, "green": 1, "blue": 0.8}   # Light Green
+#     elif "PROFIT" in decision or "EXIT" in decision: #        return {"red": 1, "green": 0.8, "blue": 0.8}   # Light Red
+#     elif "HOLD" in decision:
+#         return {"red": 1, "green": 1, "blue": 0.6}     # Yellow
+#     else:
+#         return {"red": 0.9, "green": 0.9, "blue": 0.9} # Grey
         
 # ===================== TELEGRAM =====================
 def send_msg(message_text):
@@ -361,14 +360,14 @@ for i, row in enumerate(data_rows, start=2):
             ]
         })
         # ===================== COLOR TRACK =====================
-        row_color = get_color(decision)
+        # row_color = get_color(decision)
 
-        format_requests.append({
-            "range": f"M{actual_row}",
-            "format": {
-                "backgroundColor": row_color
-            }
-        })
+        # format_requests.append({
+        #     "range": f"M{actual_row}",
+        #     "format": {
+        #         "backgroundColor": row_color
+        #     }
+        # })
         # ================= TELEGRAM =================
         # if ("BUY" in decision or "PROFIT" in decision) and rank in ["🔥 Strong Buy", "👍 Good"]:
         if "BUY" in decision or "PROFIT" in decision:
@@ -390,28 +389,28 @@ print(f"Messages count: {len(messages)}")
  # ===================== APPLY COLORS =====================
  # from gspread_formatting import format_cell_ranges, CellFormat, Color
         
-if format_requests:
-    print(f"Applying colors to {len(format_requests)} rows...")
-    try:
-        formatted_ranges = []
+# if format_requests:
+#     print(f"Applying colors to {len(format_requests)} rows...")
+#     try:
+#         formatted_ranges = []
 
-        for req in format_requests:
-            r = req["range"]
-            c = req["format"]["backgroundColor"]
+#         for req in format_requests:
+#             r = req["range"]
+#             c = req["format"]["backgroundColor"]
 
-            formatted_ranges.append((
-                r,
-                CellFormat(
-                    backgroundColor=Color(c["red"], c["green"], c["blue"])
-                )
-            ))
+#             formatted_ranges.append((
+#                 r,
+#                 CellFormat(
+#                     backgroundColor=Color(c["red"], c["green"], c["blue"])
+#                 )
+#             ))
 
-        format_cell_ranges(sheet, formatted_ranges)
+#         format_cell_ranges(sheet, formatted_ranges)
 
-        print("✅ Color formatting applied")
+#         print("✅ Color formatting applied")
 
-    except Exception as e:
-        print("❌ Color formatting failed:", e)
+#     except Exception as e:
+#         print("❌ Color formatting failed:", e)
 
 # ✅ ADD HERE (Telegram fix)
 #if messages:
