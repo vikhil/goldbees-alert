@@ -151,31 +151,6 @@ for i, row in enumerate(data_rows, start=2):
             })
             continue
 
-        # ===================== APPLY COLORS =====================
-        #from gspread_formatting import format_cell_ranges, CellFormat, Color
-        
-        if format_requests:
-            print(f"Applying colors to {len(format_requests)} rows...")
-            try:
-                formatted_ranges = []
-
-                for req in format_requests:
-                    r = req["range"]
-                    c = req["format"]["backgroundColor"]
-
-                    formatted_ranges.append((
-                        r,
-                        CellFormat(
-                            backgroundColor=Color(c["red"], c["green"], c["blue"])
-                        )
-                    ))
-
-                format_cell_ranges(sheet, formatted_ranges)
-
-                print("✅ Color formatting applied")
-
-            except Exception as e:
-                print("❌ Color formatting failed:", e)
         # ===================== Handle empty qty/buy price gracefully =====================
         try:
             qty = float(row[1]) if row[1] else 0
@@ -411,6 +386,32 @@ for i, row in enumerate(data_rows, start=2):
 # print("Messages count:", len(messages))
 print(f"Updates count: {len(updates)}")
 print(f"Messages count: {len(messages)}")
+
+ # ===================== APPLY COLORS =====================
+        #from gspread_formatting import format_cell_ranges, CellFormat, Color
+        
+        if format_requests:
+            print(f"Applying colors to {len(format_requests)} rows...")
+            try:
+                formatted_ranges = []
+
+                for req in format_requests:
+                    r = req["range"]
+                    c = req["format"]["backgroundColor"]
+
+                    formatted_ranges.append((
+                        r,
+                        CellFormat(
+                            backgroundColor=Color(c["red"], c["green"], c["blue"])
+                        )
+                    ))
+
+                format_cell_ranges(sheet, formatted_ranges)
+
+                print("✅ Color formatting applied")
+
+            except Exception as e:
+                print("❌ Color formatting failed:", e)
 
 # ✅ ADD HERE (Telegram fix)
 #if messages:
