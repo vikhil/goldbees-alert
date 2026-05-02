@@ -419,28 +419,29 @@ for i, row in enumerate(data_rows, start=2):
         # 🚫 BLOCK BUY if stock deeply negative # 🚫 HARD STOP: Do NOT allow buying in deep loss
         if pl_percent < -15:
             decision = "⛔ STOP ADDING (Heavy Loss)"
+            
         else:
             if market_trend == "BEARISH":
                 decision = "⛔ NO TRADE (Market Weak)"
-            if pl_percent >= 10:
-                decision = "BOOK PROFIT 💰"
+                if pl_percent >= 10:
+                    decision = "BOOK PROFIT 💰"
             
-        elif price > recent_high and volume > vol_avg and adx > 20:
-            decision = "🚀 BUY BREAKOUT"
+            elif price > recent_high and volume > vol_avg and adx > 20:
+                decision = "🚀 BUY BREAKOUT"
             
-        elif pl_percent < 0:
-            #if price < ema50 and rsi < 35:
-                #decision = "❌ AVOID ADD"
-            elif price > ema50 and rsi > 45 and price > vwap:
-                decision = "🟢 BUY ON DIP"
-            else:
-                decision = "⏳ HOLD"
+            elif pl_percent < 0:
+                #if price < ema50 and rsi < 35:
+                    #decision = "❌ AVOID ADD"
+                if price > ema50 and rsi > 45 and price > vwap:
+                    decision = "🟢 BUY ON DIP"
+                else:
+                    decision = "⏳ HOLD"
                 
-        elif pl_percent >= 10:
-            decision = "💰 BOOK PROFIT"
+            elif pl_percent >= 10:
+                decision = "💰 BOOK PROFIT"
             
-        elif price < trail_stop and pl_percent > 5:
-            decision = "🔻 TRAIL STOP EXIT"
+            elif price < trail_stop and pl_percent > 5:
+                decision = "🔻 TRAIL STOP EXIT"
             
         print(ticker, "Score:", score, "RSI:", rsi, "ADX:", adx, "Decision:", decision)
 
