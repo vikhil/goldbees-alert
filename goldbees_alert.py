@@ -419,7 +419,7 @@ for i, row in enumerate(data_rows, start=2):
         # 🚫 BLOCK BUY if stock deeply negative # 🚫 HARD STOP: Do NOT allow buying in deep loss
         if pl_percent < -15:
             decision = "⛔ STOP ADDING (Heavy Loss)"
-        else
+        else:
             if market_trend == "BEARISH":
             decision = "⛔ NO TRADE (Market Weak)"
             if pl_percent >= 10:
