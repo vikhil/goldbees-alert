@@ -142,6 +142,12 @@ def send_msg(message_text):
             "parse_mode": "Markdown"
         }, timeout=10)
 
+        if res.status_code == 429:
+            retry_after = res.json().get("parameters", {}).get("retry_after", 5)
+            print(f"Rate limited. Retrying after {retry_after}s")
+            time.sleep(retry_after)
+            return send_msg(message_text)
+            
         print("Telegram response:", res.status_code)
 
         if res.status_code != 200:
@@ -149,8 +155,6 @@ def send_msg(message_text):
 
     except Exception as e:
         print("Telegram exception:", e)
-
-    send_premarket_report()
     
 # ===================== RSI =====================
 def calculate_rsi(data, period=14):
@@ -220,13 +224,15 @@ sector_summary = []
 
 print("Script started")
 
+send_premarket_report()   # ✅ ADD THIS LINE HERE
+
 total_invested = 0
 total_value = 0
 
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
     import time
-    time.sleep(1)
+   # time.sleep(0.2)
     
     try:
         actual_row = i
@@ -251,15 +257,29 @@ for i, row in enumerate(data_rows, start=2):
         
         # ================= YAHOO DATA =================
         try:
-            data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
-
-            if data is None or data.empty:
+            data = yf.download(ticker, period="5d", interval="15m", progress=False, group_by='column',threads=False)
+            
+            if data is None or data.empty or len(data) < 20:
                 invalid_tickers.append(ticker)
                 continue
 
             # FIX: flatten multi-level columns
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.get_level_values(0)
+                
+            #if data is None or data.empty:
+                #invalid_tickers.append(ticker)
+                #continue
+            
+            price = data['Close'].iloc[-1] if not data.empty else None
+
+            if price is None or pd.isna(price):
+                print(f"Skipping {ticker} due to invalid price")
+                continue
+    
+            # FIX: flatten multi-level columns
+            #if isinstance(data.columns, pd.MultiIndex):
+                #data.columns = data.columns.get_level_values(0)
 
         except Exception as e:
             print(f"Yahoo error for {ticker}: {e}")
