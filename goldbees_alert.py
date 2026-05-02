@@ -245,12 +245,6 @@ for i, row in enumerate(data_rows, start=2):
             continue
 
         # ===================== Handle empty qty/buy price gracefully =====================
-        #try:
-            #qty = float(row[1]) if row[1] else 0
-            #buy_price = float(row[2]) if row[2] else price
-        #except:
-            #qty = 0
-            #buy_price = price
 
         qty = safe_float(row[1]) if len(row) > 1 else 0
         buy_price = safe_float(row[2]) if len(row) > 2 else 0
@@ -276,10 +270,6 @@ for i, row in enumerate(data_rows, start=2):
             if price is None or pd.isna(price):
                 print(f"Skipping {ticker} due to invalid price")
                 continue
-    
-            # FIX: flatten multi-level columns
-            #if isinstance(data.columns, pd.MultiIndex):
-                #data.columns = data.columns.get_level_values(0)
 
         except Exception as e:
             print(f"Yahoo error for {ticker}: {e}")
