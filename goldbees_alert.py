@@ -430,6 +430,7 @@ for i, row in enumerate(data_rows, start=2):
         
         # Drawdown protection (global safety)
         elif total_invested > 0 and portfolio_pl < -20:
+        elif total_invested > 0 and ((total_value - total_invested) / total_invested) < -0.20:    
             allow_trade = False
             risk_block_reason = "MAX DRAWDOWN HIT"
         
@@ -649,16 +650,31 @@ if batch_data:
     print(f"Updating {len(batch_data)} rows in Google Sheet...")
 
     try:
-        sheet.batch_update([
-            {
-                "range": item["range"],
-                "values": item["values"]
-            }
-            for item in batch_data
-        ])
+        #sheet.batch_update([
+            #{
+               # "range": item["range"],
+               # "values": item["values"]
+            #}
+            #for item in batch_data
+        #])
+        cell_updates = []
 
-        print("✅ Sheet update successful")
-
+        for u in updates:
+            row = u["row"]
+            values = u["data"]
+        
+            for idx, val in enumerate(values):
+                col = chr(68 + idx)  # D = 68 ASCII
+                cell_updates.append({
+                    "range": f"{col}{row}",
+                    "values": [[val]]
+                })
+        if cell_updates:
+            sheet.batch_update(cell_updates)
+            print("✅ Sheet update successful")
+        else:
+            print("No updates to push")
+            
     except Exception as e:
         print("❌ Google Sheets batch update failed:", e)
 
@@ -680,8 +696,15 @@ if total_invested > 0 and portfolio_pl < max_drawdown_limit:
 if invalid_tickers:
     messages.append(f"⚠️ Invalid tickers: {', '.join(invalid_tickers)}")
 
-if not messages:
-    messages.append("No strong signals right now 📊")
+# Always ensure portfolio summary exists
+if len(messages) == 0:
+    messages = ["No strong signals right now 📊"]
+
+# Always append portfolio P/L last
+messages.append(f"\n📊 *Portfolio P/L:* {round(portfolio_pl,2)}%")
+
+#if not messages:
+    #messages.append("No strong signals right now 📊")
 
 # ===================== TELEGRAM =====================
 try:
