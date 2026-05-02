@@ -421,7 +421,7 @@ for i, row in enumerate(data_rows, start=2):
             decision = "⛔ STOP ADDING (Heavy Loss)"
         else:
             if market_trend == "BEARISH":
-            decision = "⛔ NO TRADE (Market Weak)"
+                decision = "⛔ NO TRADE (Market Weak)"
             if pl_percent >= 10:
                 decision = "BOOK PROFIT 💰"
             
