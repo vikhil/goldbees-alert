@@ -365,9 +365,9 @@ for i, row in enumerate(data_rows, start=2):
             score += 1
     
         # ===== FINAL RANK =====
-        if score >= 7:
+        if score >= 9:
             rank = "🔥 Strong Buy"
-        elif score >= 5:
+        elif score >= 6:
             rank = "👍 Good"
         elif score >= 3:
             rank = "⚠️ Weak"
@@ -400,7 +400,7 @@ for i, row in enumerate(data_rows, start=2):
         elif price > ema50:
             target = price * 1.04
         else:
-            target = price * 1.02
+            target = max(price * 1.02, ema50)  # prevent illogical targets
 
         stop_loss = buy_price * 0.98
         trail_stop = price * 0.97
@@ -414,18 +414,23 @@ for i, row in enumerate(data_rows, start=2):
             confidence = "⭐"
 
         # ================= DECISION =================
-        decision = "HOLD"
-    
-        if market_trend == "BEARISH":
+        decision = "⏳ HOLD"
+        
+        # 🚫 BLOCK BUY if stock deeply negative # 🚫 HARD STOP: Do NOT allow buying in deep loss
+        if pl_percent < -15:
+            decision = "⛔ STOP ADDING (Heavy Loss)"
+        else
+            if market_trend == "BEARISH":
             decision = "⛔ NO TRADE (Market Weak)"
             if pl_percent >= 10:
                 decision = "BOOK PROFIT 💰"
-        
-        if price > recent_high and volume > vol_avg and adx > 20:
+            
+        elif price > recent_high and volume > vol_avg and adx > 20:
             decision = "🚀 BUY BREAKOUT"
+            
         elif pl_percent < 0:
-            if price < ema50 and rsi < 35:
-                decision = "❌ AVOID ADD"
+            #if price < ema50 and rsi < 35:
+                #decision = "❌ AVOID ADD"
             elif price > ema50 and rsi > 45 and price > vwap:
                 decision = "🟢 BUY ON DIP"
             else:
@@ -436,9 +441,7 @@ for i, row in enumerate(data_rows, start=2):
             
         elif price < trail_stop and pl_percent > 5:
             decision = "🔻 TRAIL STOP EXIT"
-        else:
-            decision = "⏳ HOLD"
-    
+            
         print(ticker, "Score:", score, "RSI:", rsi, "ADX:", adx, "Decision:", decision)
 
         # ================= ALLOCATION =================
@@ -451,8 +454,12 @@ for i, row in enumerate(data_rows, start=2):
         else:
             allocation_pct = 0.0
     
-        if pl_percent < -15:
+        if -15 < pl_percent < -5:
             allocation_pct += 0.05
+        
+        # 🚫 FINAL SAFETY LOCK
+        if "STOP ADDING" in decision:
+            allocation_pct = 0
     
         buy_amount = PROFIT_POOL * allocation_pct
         buy_qty = int(buy_amount / price) if price > 0 else 0
