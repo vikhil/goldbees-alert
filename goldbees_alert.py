@@ -229,7 +229,7 @@ send_premarket_report()   # ✅ ADD THIS LINE HERE
 
 total_invested = 0
 total_value = 0
-
+   
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
    # time.sleep(0.2)
@@ -326,13 +326,14 @@ for i, row in enumerate(data_rows, start=2):
         data['ADX'] = dx.rolling(14).mean()
         
         # ================= VALUES =================
-        price = data['Close'].iloc[-1].item()
+        #price = data['Close'].iloc[-1].item()
+        price = safe_float(data['Close'].iloc[-1])
         rsi = safe_float(data['RSI'].iloc[-1])
         ema50 = safe_float(data['EMA50'].iloc[-1])
         ema20 = safe_float(data['EMA20'].iloc[-1])
         volume = safe_float(data['Volume'].iloc[-1])
         vol_avg = safe_float(data['VOL_AVG'].iloc[-1])
-        recent_high = data['High'].rolling(20).max().iloc[-2].item()
+        recent_high = safe_float(data['High'].rolling(20).max().iloc[-2])
         vwap = safe_float(data['VWAP'].iloc[-1])  
         
         adx_val = data['ADX'].iloc[-1]
@@ -451,7 +452,8 @@ for i, row in enumerate(data_rows, start=2):
         buy_qty = 0
 
         # ================= SCORE GATE =================
-        allow_trade = score >= 6   # define score gate here
+        #allow_trade = score >= 6   # define score gate here
+        allow_trade = (score >= 6) and (pl_percent > -15)
 
         # ================= TREND REGIME FILTER =================
         trend_regime_ok = (market_trend == "BULLISH")
@@ -552,7 +554,7 @@ for i, row in enumerate(data_rows, start=2):
         
         # ================= TELEGRAM =================
         # if ("BUY" in decision or "PROFIT" in decision) and signal_strength in ["🔥 Strong Buy", "👍 Good"]:
-        if "BUY" in decision or "PROFIT" in decision:
+        if decision in ["🚀 BUY BREAKOUT", "🟢 BUY ON DIP", "BOOK PROFIT 💰"]:
             messages.append(
                 f"📊 *{ticker}*\n"
                 f"P/L: {round(pl_percent,2)}%\n"
@@ -673,10 +675,11 @@ if batch_data:
 # ===================== SUMMARY =====================
 if total_invested > 0:
     portfolio_pl = ((total_value - total_invested) / total_invested) * 100
-
+else:
+    portfolio_pl = 0
+    
 messages.append(f"\n📊 *Portfolio P/L:* {round(portfolio_pl,2)}%")
 
-    
 # ================= MAX DRAWDOWN CONTROL =================
 max_drawdown_limit = -20  # %
 allow_new_trades = True
