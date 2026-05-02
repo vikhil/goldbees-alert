@@ -9,6 +9,7 @@ from datetime import datetime
 import pytz
 #from gspread_formatting import format_cell_ranges, CellFormat, Color
 import math
+import time
 
 # ===================== PRE-MARKET REPORT =====================
 def send_premarket_report():
@@ -231,7 +232,6 @@ total_value = 0
 
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
-    import time
    # time.sleep(0.2)
     
     try:
@@ -336,8 +336,10 @@ for i, row in enumerate(data_rows, start=2):
         vwap = safe_float(data['VWAP'].iloc[-1])  
         
         adx_val = data['ADX'].iloc[-1]
-       # adx = float(adx_val) if pd.notna(adx_val) else 0
         adx = safe_float(data['ADX'].iloc[-1])
+        
+        # ================= TREND REGIME FILTER =================
+        trend_regime_ok = (price > ema50) and (adx > 25)
 
         # ✅ ADD THIS BLOCK HERE
         if pd.isna(price) or pd.isna(rsi) or pd.isna(adx):
@@ -363,16 +365,20 @@ for i, row in enumerate(data_rows, start=2):
             score += 2   # strong trend
         elif adx > 20:
             score += 1
-    
-        # ===== FINAL RANK =====
+        
+        # ================= SCORE GATE =================
+        #min_score_to_trade = 6
+        #allow_trade = score >= min_score_to_trade
+
+        # ===== FINAL signal_strength =====
         if score >= 9:
-            rank = "🔥 Strong Buy"
+            signal_strength = "STRONG"
         elif score >= 6:
-            rank = "👍 Good"
+            signal_strength = "GOOD"
         elif score >= 3:
-            rank = "⚠️ Weak"
+            signal_strength = "WEAK"
         else:
-            rank = "❌ Avoid"
+            signal_strength = "NOISE"
 
         # ================= P/L =================
         if buy_price > 0:
@@ -413,60 +419,113 @@ for i, row in enumerate(data_rows, start=2):
         else:
             confidence = "⭐"
 
-        # ================= DECISION =================
-        decision = "⏳ HOLD"
+        # ===================== RISK ENGINE =====================
+        #allow_trade = True
         
-        # 🚫 BLOCK BUY if stock deeply negative # 🚫 HARD STOP: Do NOT allow buying in deep loss
+        # Hard loss protection
         if pl_percent < -15:
-            decision = "⛔ STOP ADDING (Heavy Loss)"
-            
+            allow_trade = False
+            risk_block_reason = "HEAVY LOSS"
+        
+        # Score gate
+        elif score < 6:
+            allow_trade = False
+            risk_block_reason = "LOW SCORE"
+        
+        # Market regime filter
+        elif market_trend == "BEARISH":
+            allow_trade = False
+            risk_block_reason = "BEAR MARKET"
+        
+        # Drawdown protection (global safety)
+        elif total_invested > 0 and portfolio_pl < -20:
+            allow_trade = False
+            risk_block_reason = "MAX DRAWDOWN HIT"
+        
         else:
-            if market_trend == "BEARISH":
-                decision = "⛔ NO TRADE (Market Weak)"
-                if pl_percent >= 10:
-                    decision = "BOOK PROFIT 💰"
-            
-            elif price > recent_high and volume > vol_avg and adx > 20:
-                decision = "🚀 BUY BREAKOUT"
-            
-            elif pl_percent < 0:
-                #if price < ema50 and rsi < 35:
-                    #decision = "❌ AVOID ADD"
-                if price > ema50 and rsi > 45 and price > vwap:
-                    decision = "🟢 BUY ON DIP"
-                else:
-                    decision = "⏳ HOLD"
-                
-            elif pl_percent >= 10:
-                decision = "💰 BOOK PROFIT"
-            
-            elif price < trail_stop and pl_percent > 5:
-                decision = "🔻 TRAIL STOP EXIT"
-            
+            risk_block_reason = "OK"
+        
+        # ===================== LAYER 1: DECISION OR RISK FILTER =====================
+        decision = "⏳ HOLD"
+        allocation_pct = 0
+        buy_qty = 0
+
+        # ================= SCORE GATE =================
+        allow_trade = score >= 6   # define score gate here
+
+        # ================= TREND REGIME FILTER =================
+        trend_regime_ok = (market_trend == "BULLISH")
+
+        # ================= MAX DRAWDOWN CONTROL =================
+        allow_new_trades = True
+        max_drawdown_limit = -20
+        
+        if total_invested > 0 and portfolio_pl < max_drawdown_limit:
+            allow_new_trades = False
+        
+        # ================= RISK + SCORE GATE CHECK =================
+        # BLOCKED PATH
+        #if not allow_trade:
+            #decision = f"⛔ BLOCKED ({risk_block_reason})"
+
+        # ================= FINAL TRADE LOGIC =================
+        if pl_percent < -15:
+            decision = "⛔ BLOCKED (Heavy Loss)"
+        
+        elif not allow_new_trades:
+            decision = "⛔ DRAWDOWN LOCK - NO TRADE"
+        
+        elif not allow_trade:
+            decision = "❌ LOW SCORE - NO TRADE"
+        
+        elif market_trend == "BEARISH":
+            decision = "⛔ NO TRADE (Market Weak)"
+        
+        elif pl_percent >= 10:
+            decision = "BOOK PROFIT 💰"
+        
+        elif trend_regime_ok and price > recent_high and volume > vol_avg:
+            decision = "🚀 BUY BREAKOUT"
+        
+        elif price > ema50 and rsi > 45 and price > vwap and pl_percent < 0:
+            decision = "🟢 BUY ON DIP"
+        
+        elif price < trail_stop and pl_percent > 5:
+            decision = "🔻 TRAIL STOP EXIT"
+        
+        else:
+            decision = "⏳ HOLD"
+        
         print(ticker, "Score:", score, "RSI:", rsi, "ADX:", adx, "Decision:", decision)
 
-        # ================= ALLOCATION =================
-        if "BREAKOUT" in decision:
+        # ===================== LAYER 3: ALLOCATION OR POSITION SIZING =====================
+        if decision == "🚀 BUY BREAKOUT":
             allocation_pct = 0.20
-        elif "Strong" in rank:
-            allocation_pct = 0.15
-        elif "BUY ON DIP" in decision:
+        
+        elif decision == "🟢 BUY ON DIP":
             allocation_pct = 0.10
+        
+        elif decision == "💰 BOOK PROFIT":
+            allocation_pct = 0.0
+        
+        #elif decision == "⛔ NO TRADE (Market Weak)":
+            #allocation_pct = 0.0
+
+        #elif decision == "⛔ BLOCKED (Heavy Loss)":
+            #allocation_pct = 0.0
+
         else:
             allocation_pct = 0.0
-    
-        if -15 < pl_percent < -5:
-            allocation_pct += 0.05
         
-        # 🚫 FINAL SAFETY LOCK
-        if "STOP ADDING" in decision:
-            allocation_pct = 0
+        # 🚫 final safety override
+        #if "BLOCKED" in decision or "STOP ADDING" in decision:
+            #allocation_pct = 0
     
         buy_amount = PROFIT_POOL * allocation_pct
         buy_qty = int(buy_amount / price) if price > 0 else 0
     
-        if "AVOID" in decision:
-            buy_qty = 0
+        #if "AVOID" in decision:
+            #buy_qty = 0
 
         # ================= STORE ROW =================
         # status = "HOLDING" if qty > 0 else "WATCHLIST"
@@ -478,7 +537,7 @@ for i, row in enumerate(data_rows, start=2):
                 current_time,
                 safe_round(target),
                 safe_round(stop_loss),
-                rank,
+                signal_strength,
                 confidence,
                 safe_round(price),
                 safe_round(rsi),
@@ -492,13 +551,13 @@ for i, row in enumerate(data_rows, start=2):
         })
         
         # ================= TELEGRAM =================
-        # if ("BUY" in decision or "PROFIT" in decision) and rank in ["🔥 Strong Buy", "👍 Good"]:
+        # if ("BUY" in decision or "PROFIT" in decision) and signal_strength in ["🔥 Strong Buy", "👍 Good"]:
         if "BUY" in decision or "PROFIT" in decision:
             messages.append(
                 f"📊 *{ticker}*\n"
                 f"P/L: {round(pl_percent,2)}%\n"
                 f"👉 {decision}\n"
-                f"⭐ {rank}"
+                f"⭐ {signal_strength}"
             )
     except Exception as e:
         print(f"Main loop error at row {i}: {e}")
@@ -614,7 +673,16 @@ if batch_data:
 # ===================== SUMMARY =====================
 if total_invested > 0:
     portfolio_pl = ((total_value - total_invested) / total_invested) * 100
-    messages.append(f"\n📊 *Portfolio P/L:* {round(portfolio_pl,2)}%")
+
+messages.append(f"\n📊 *Portfolio P/L:* {round(portfolio_pl,2)}%")
+
+    
+# ================= MAX DRAWDOWN CONTROL =================
+max_drawdown_limit = -20  # %
+allow_new_trades = True
+
+if total_invested > 0 and portfolio_pl < max_drawdown_limit:
+    allow_new_trades = False
 
 if invalid_tickers:
     messages.append(f"⚠️ Invalid tickers: {', '.join(invalid_tickers)}")
