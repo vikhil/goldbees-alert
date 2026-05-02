@@ -433,7 +433,7 @@ for i, row in enumerate(data_rows, start=2):
         elif total_invested > 0 and ((total_value - total_invested) / total_invested) < -0.20:    
             allow_trade = False
             risk_block_reason = "MAX DRAWDOWN HIT"
-        
+            decision = "⛔ DRAWDOWN LOCK - NO TRADE"
         else:
             risk_block_reason = "OK"
         
@@ -472,7 +472,7 @@ for i, row in enumerate(data_rows, start=2):
             decision = "❌ LOW SCORE - NO TRADE"
         
         elif market_trend == "BEARISH":
-            decision = "⛔ NO TRADE (Market Weak)"
+            decision = "⛔ NO TRADE (Market Weak)"            
         
         elif pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
