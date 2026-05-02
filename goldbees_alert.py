@@ -10,40 +10,76 @@ import pytz
 #from gspread_formatting import format_cell_ranges, CellFormat, Color
 import math
 
-url = "https://www.nseindia.com/api/market-data-pre-open?key=ALL"
-
-headers = {
-    "User-Agent": "Mozilla/5.0",
-    "Accept-Language": "en-US,en;q=0.9"
-}
-
-session = requests.Session()
-session.get("https://www.nseindia.com", headers=headers)  # important
-
-response = session.get(url, headers=headers)
-data = response.json()
-
-stocks = data['data']
-
-upper_circuit = []
-lower_circuit = []
-flat_open = []
-
-for stock in stocks:
+# ===================== PRE-MARKET REPORT =====================
+def send_premarket_report():
     try:
-        info = stock['metadata']
-        symbol = info['symbol']
-        change = float(info['pChange'])  # % change
+        import requests
+        from datetime import datetime
+        import pytz
 
-        if change >= 5:
-            upper_circuit.append(symbol)
-        elif change <= -5:
-            lower_circuit.append(symbol)
-        elif -0.2 <= change <= 0.2:
-            flat_open.append(symbol)
+        IST = pytz.timezone("Asia/Kolkata")
+        today = datetime.now(IST).weekday()  # Monday = 0
+        
+        url = "https://www.nseindia.com/api/market-data-pre-open?key=ALL"
 
-    except:
-        continue
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+
+        session = requests.Session()
+        session.get("https://www.nseindia.com", headers=headers)  # important
+
+        response = session.get(url, headers=headers)
+        data = response.json()
+
+        stocks = data.get('data', [])
+
+        upper_circuit = []
+        lower_circuit = []
+        flat_open = []
+
+        for stock in stocks:
+            try:
+                info = stock['metadata']
+                symbol = info['symbol']
+                change = float(info['pChange'])  # % change
+    
+                if change >= 5:
+                    upper_circuit.append(symbol)
+                elif change <= -5:
+                    lower_circuit.append(symbol)
+                elif -0.2 <= change <= 0.2:
+                    flat_open.append(symbol)
+    
+            except:
+                continue
+        # ================= MESSAGE =================
+        if today == 0:
+            # MONDAY → SUMMARY
+            msg = (
+                "📊 *Pre-Market Weekly Snapshot*\n\n"
+                f"🟢 Upper Circuit: {len(upper_circuit)}\n"
+                f"🔴 Lower Circuit: {len(lower_circuit)}\n"
+                f"⚖️ Flat Open: {len(flat_open)}"
+            )
+        else:
+            # DAILY → FULL LIST
+            msg = "*📊 Pre-Market Movers*\n\n"
+
+            msg += f"🟢 Upper Circuit ({len(upper_circuit)}):\n"
+            msg += ", ".join(upper_circuit[:25]) + "\n\n"
+
+            msg += f"🔴 Lower Circuit ({len(lower_circuit)}):\n"
+            msg += ", ".join(lower_circuit[:25]) + "\n\n"
+
+            msg += f"⚖️ Flat Open ({len(flat_open)}):\n"
+            msg += ", ".join(flat_open[:25])
+
+        send_msg(msg)
+
+    except Exception as e:
+        print("Pre-market fetch failed:", e)
         
 def safe_float(x):
     try:
@@ -60,7 +96,7 @@ round = __builtins__.round
 
 IST = pytz.timezone("Asia/Kolkata")
 current_time = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
-
+    
 # ===================== CONFIG =====================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -114,6 +150,8 @@ def send_msg(message_text):
     except Exception as e:
         print("Telegram exception:", e)
 
+    send_premarket_report()
+    
 # ===================== RSI =====================
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff()
