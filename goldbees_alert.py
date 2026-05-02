@@ -430,10 +430,10 @@ for i, row in enumerate(data_rows, start=2):
         
         # Drawdown protection (global safety)
         elif total_invested > 0 and portfolio_pl < -20:
-        elif total_invested > 0 and ((total_value - total_invested) / total_invested) < -0.20:    
+        #elif total_invested > 0 and ((total_value - total_invested) / total_invested) < -0.20:    
             allow_trade = False
             risk_block_reason = "MAX DRAWDOWN HIT"
-            decision = "⛔ DRAWDOWN LOCK - NO TRADE"
+        
         else:
             risk_block_reason = "OK"
         
@@ -473,7 +473,10 @@ for i, row in enumerate(data_rows, start=2):
         
         elif market_trend == "BEARISH":
             decision = "⛔ NO TRADE (Market Weak)"            
-        
+
+        #elif total_invested > 0 and ((total_value - total_invested) / total_invested) < -0.20:
+            #decision = "⛔ DRAWDOWN LOCK - NO TRADE"
+    
         elif pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
         
