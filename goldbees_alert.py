@@ -10,6 +10,41 @@ import pytz
 #from gspread_formatting import format_cell_ranges, CellFormat, Color
 import math
 
+url = "https://www.nseindia.com/api/market-data-pre-open?key=ALL"
+
+headers = {
+    "User-Agent": "Mozilla/5.0",
+    "Accept-Language": "en-US,en;q=0.9"
+}
+
+session = requests.Session()
+session.get("https://www.nseindia.com", headers=headers)  # important
+
+response = session.get(url, headers=headers)
+data = response.json()
+
+stocks = data['data']
+
+upper_circuit = []
+lower_circuit = []
+flat_open = []
+
+for stock in stocks:
+    try:
+        info = stock['metadata']
+        symbol = info['symbol']
+        change = float(info['pChange'])  # % change
+
+        if change >= 5:
+            upper_circuit.append(symbol)
+        elif change <= -5:
+            lower_circuit.append(symbol)
+        elif -0.2 <= change <= 0.2:
+            flat_open.append(symbol)
+
+    except:
+        continue
+        
 def safe_float(x):
     try:
         if x is None or (isinstance(x, float) and math.isnan(x)):
