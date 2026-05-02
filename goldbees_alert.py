@@ -225,6 +225,8 @@ total_value = 0
 
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
+    import time
+    time.sleep(1)
     
     try:
         actual_row = i
@@ -237,13 +239,16 @@ for i, row in enumerate(data_rows, start=2):
             continue
 
         # ===================== Handle empty qty/buy price gracefully =====================
-        try:
-            qty = float(row[1]) if row[1] else 0
-            buy_price = float(row[2]) if row[2] else price
-        except:
-            qty = 0
-            buy_price = price
-            
+        #try:
+            #qty = float(row[1]) if row[1] else 0
+            #buy_price = float(row[2]) if row[2] else price
+        #except:
+            #qty = 0
+            #buy_price = price
+
+        qty = safe_float(row[1]) if len(row) > 1 else 0
+        buy_price = safe_float(row[2]) if len(row) > 2 else 0
+        
         # ================= YAHOO DATA =================
         try:
             data = yf.download(ticker, period="1d", interval="5m", progress=False, group_by='column')
@@ -591,7 +596,17 @@ if not messages:
 
 # ===================== TELEGRAM =====================
 try:
-    send_msg("🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages))
+    #send_msg("🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages))
+    if messages:
+        final_message = "🚨 *Portfolio Alerts*\n\n" + "\n\n".join(messages)
+
+        # Telegram max limit safety (4096 chars)
+        if len(final_message) > 4000:
+            final_message = final_message[:4000]
+
+        send_msg(final_message)
+    else:
+        print("No messages to send")
 except Exception as e:
     print("Final Telegram send failed:", e)
     
