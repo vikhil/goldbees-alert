@@ -432,7 +432,7 @@ for i, row in enumerate(data_rows, start=2):
         elif market_trend == "BEARISH":
             risk_block_reason = "BEAR MARKET"
 
-        # Portfolio-level risk (GLOBAL ONLY)
+        # ================= PORTFOLIO RISK =================
         portfolio_locked = False
         
         # Portfolio drawdown protection
@@ -440,11 +440,11 @@ for i, row in enumerate(data_rows, start=2):
             portfolio_locked = True
         
         # Final trade permission (SINGLE SOURCE OF TRUTH)
-        allow_trade = (risk_block_reason == "OK") and (not portfolio_locked)
+        #allow_trade = (risk_block_reason == "OK") and (not portfolio_locked)
     
         # ===================== LAYER 1: DECISION OR RISK FILTER =====================
         decision = "⏳ HOLD"
-        decision_note = ""
+        #decision_note = ""
 
         # ================= TREND REGIME FILTER =================
         trend_regime_ok = (market_trend == "BULLISH")
@@ -482,9 +482,10 @@ for i, row in enumerate(data_rows, start=2):
         else:
             decision = "⏳ HOLD"
 
-        # Optional portfolio warning (DO NOT overwrite decision)
-        #if portfolio_locked:
-            #decision_note = "⚠️ PORTFOLIO RISK ACTIVE"
+        # ===================== GLOBAL SAFETY OVERRIDE (CRITICAL) =====================
+
+        if portfolio_locked and ("BUY" in decision):
+            decision = "❌ BLOCKED (PORTFOLIO DRAWDOWN)"
 
         # ===================== PRINT / LOG LINE =====================
         print(ticker, "Score:", score, "RSI:", rsi, "ADX:", adx, "Decision:", decision)
@@ -515,9 +516,20 @@ for i, row in enumerate(data_rows, start=2):
             allocation_pct = 0.0
         
         # ================= FINAL SAFETY OVERRIDE =================
-        if ("BLOCKED" in decision) or ("DRAWDOWN" in decision):
+        # Force block all BUY signals during drawdown
+        #if portfolio_locked and ("BUY" in decision):
+            #decision = "❌ BLOCKED (PORTFOLIO DRAWDOWN)"
+            #allocation_pct = 0
+            #buy_qty = 0
+         
+        # Also ensure allocation is zero for any BLOCKED decision
+        if "BLOCKED" in decision:
             allocation_pct = 0
-            buy_qty = 0
+            buy_qty = 0   
+        
+        #if ("BLOCKED" in decision) or ("DRAWDOWN" in decision):
+            #allocation_pct = 0
+            #buy_qty = 0
         else:
             buy_amount = PROFIT_POOL * allocation_pct
             buy_qty = int(buy_amount / price) if price > 0 else 0
