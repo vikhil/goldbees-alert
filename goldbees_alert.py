@@ -431,62 +431,58 @@ for i, row in enumerate(data_rows, start=2):
         # Market regime filter
         elif market_trend == "BEARISH":
             risk_block_reason = "BEAR MARKET"
+
+        # Portfolio-level risk (GLOBAL ONLY)
+        portfolio_locked = False
         
         # Portfolio drawdown protection
-        elif total_invested > 0 and current_drawdown < -20:
-            risk_block_reason = "MAX DRAWDOWN HIT"
+        if total_invested > 0 and current_drawdown < -20:
+            portfolio_locked = True
         
         # Final trade permission (SINGLE SOURCE OF TRUTH)
-        allow_trade = (risk_block_reason == "OK" and market_trend == "BULLISH" and score >= 6 and pl_percent > -15)
+        allow_trade = (risk_block_reason == "OK") and (not portfolio_locked)
     
         # ===================== LAYER 1: DECISION OR RISK FILTER =====================
         decision = "⏳ HOLD"
-        allocation_pct = 0
-        buy_qty = 0
+        decision_note = ""
 
         # ================= TREND REGIME FILTER =================
         trend_regime_ok = (market_trend == "BULLISH")
-
-        # ================= MAX DRAWDOWN CONTROL =================
-        allow_new_trades = True
-        max_drawdown_limit = -20
         
-        # ✅ FIX: use current_drawdown instead of portfolio_pl
-        if total_invested > 0 and current_drawdown < max_drawdown_limit:
-            allow_new_trades = False
-        
-        # ================= FINAL TRADE LOGIC =================
+        # If blocked by stock-level or portfolio-level risk
         if not allow_trade:
             decision = f"❌ BLOCKED ({risk_block_reason})"
-            
-        elif not allow_new_trades:
-            decision = "⛔ DRAWDOWN LOCK - NO TRADE"
-
-        elif market_trend == "BEARISH":
-            decision = "⛔ NO TRADE (Market Weak)" 
-
+        
+        # Normal profit booking
         elif pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
             
-        #elif pl_percent < -15:
-            #decision = "⛔ BLOCKED (Heavy Loss)"
+        # Market-level filter (kept AFTER risk gating)
+        elif market_trend == "BEARISH":
+            decision = "⛔ NO TRADE (Market Weak)"
 
-        #elif current_drawdown < -20:
-            #decision = "⛔ DRAWDOWN LOCK - NO TRADE"
-    
+        # Entry conditions
         elif trend_regime_ok and price > recent_high and volume > vol_avg:
             decision = "🚀 BUY BREAKOUT"
         
         elif price > ema50 and rsi > 45 and price > vwap and pl_percent < 0:
             decision = "🟢 BUY ON DIP"
-        
+            
+        # Exit condition
         elif price < trail_stop and pl_percent > 5:
             decision = "🔻 TRAIL STOP EXIT"
         
         else:
             decision = "⏳ HOLD"
-        
+
+        # Optional portfolio warning (DO NOT overwrite decision)
+        if portfolio_locked:
+            decision_note = "⚠️ PORTFOLIO RISK ACTIVE"
+
+        # ===================== PRINT / LOG LINE =====================
         print(ticker, "Score:", score, "RSI:", rsi, "ADX:", adx, "Decision:", decision)
+        if portfolio_locked:
+            print("⚠️ Portfolio Drawdown Active")
 
         # ===================== LAYER 3: ALLOCATION OR POSITION SIZING =====================
         if decision == "🚀 BUY BREAKOUT":
