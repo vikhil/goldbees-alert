@@ -457,7 +457,7 @@ for i, row in enumerate(data_rows, start=2):
         if is_blocked:
             if portfolio_locked:
                 decision = f"❌ BLOCKED (PORTFOLIO DRAWDOWN)"
-            else   
+            else:   
                 decision = f"❌ BLOCKED ({risk_block_reason})"
         
         # Normal profit booking
