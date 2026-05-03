@@ -442,10 +442,6 @@ for i, row in enumerate(data_rows, start=2):
         allocation_pct = 0
         buy_qty = 0
 
-        # ================= SCORE GATE =================
-        #allow_trade = score >= 6   # define score gate here
-        #allow_trade = (score >= 6) and (pl_percent > -15)
-
         # ================= TREND REGIME FILTER =================
         trend_regime_ok = (market_trend == "BULLISH")
 
@@ -453,16 +449,16 @@ for i, row in enumerate(data_rows, start=2):
         allow_new_trades = True
         max_drawdown_limit = -20
         
-        if total_invested > 0 and portfolio_pl < max_drawdown_limit:
+        # ✅ FIX: use current_drawdown instead of portfolio_pl
+        if total_invested > 0 and current_drawdown < max_drawdown_limit:
             allow_new_trades = False
         
         # ================= RISK + SCORE GATE CHECK =================
         # BLOCKED PATH
-        if not allow_trade:
+        #if not allow_trade:
             #decision = f"⛔ BLOCKED ({risk_block_reason})"
 
         # ================= FINAL TRADE LOGIC =================
-        decision = "⏳ HOLD"
         
         if pl_percent < -15:
             decision = "⛔ BLOCKED (Heavy Loss)"
@@ -472,24 +468,15 @@ for i, row in enumerate(data_rows, start=2):
         
         elif not allow_trade:
             decision = f"❌ BLOCKED ({risk_block_reason})"
-        
-        #elif not allow_new_trades:
-            #decision = "⛔ DRAWDOWN LOCK - NO TRADE"
-        
-        #elif not allow_trade:
-            #decision = "❌ LOW SCORE - NO TRADE"
-        
-        #elif market_trend == "BEARISH":
-            #decision = "⛔ NO TRADE (Market Weak)"            
+
+        elif market_trend == "BEARISH":
+            decision = "⛔ NO TRADE (Market Weak)"          
     
         elif pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
-
-        elif market_trend == "BULLISH" and price > recent_high and volume > vol_avg:
-            decision = "🚀 BUY BREAKOUT"
     
-        #elif trend_regime_ok and price > recent_high and volume > vol_avg:
-        #    decision = "🚀 BUY BREAKOUT"
+        elif trend_regime_ok and price > recent_high and volume > vol_avg:
+            decision = "🚀 BUY BREAKOUT"
         
         elif price > ema50 and rsi > 45 and price > vwap and pl_percent < 0:
             decision = "🟢 BUY ON DIP"
