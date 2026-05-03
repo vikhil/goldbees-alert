@@ -412,11 +412,13 @@ for i, row in enumerate(data_rows, start=2):
 
         # ===================== RISK ENGINE =====================
         
-        # Calculate current portfolio drawdown safely
+        # ================= SAFE METRICS =================
         current_drawdown = ((total_value - total_invested) / total_invested) * 100 if total_invested > 0 else 0        
 
-        # Default
+        # Default risk state
         risk_block_reason = "OK"
+
+        # ================= RISK FILTERS =================
         
         # Hard loss protection
         if pl_percent < -15:
@@ -430,12 +432,12 @@ for i, row in enumerate(data_rows, start=2):
         elif market_trend == "BEARISH":
             risk_block_reason = "BEAR MARKET"
         
-        # Global Drawdown protection
+        # Portfolio drawdown protection
         elif total_invested > 0 and current_drawdown < -20:
             risk_block_reason = "MAX DRAWDOWN HIT"
-            
-        # Final decision: allow or block trade
-        allow_trade = (risk_block_reason == "OK")
+        
+        # Final trade permission (SINGLE SOURCE OF TRUTH)
+        allow_trade = (risk_block_reason == "OK" and market_trend == "BULLISH" and score >= 6 and pl_percent > -15)
     
         # ===================== LAYER 1: DECISION OR RISK FILTER =====================
         decision = "⏳ HOLD"
@@ -453,27 +455,24 @@ for i, row in enumerate(data_rows, start=2):
         if total_invested > 0 and current_drawdown < max_drawdown_limit:
             allow_new_trades = False
         
-        # ================= RISK + SCORE GATE CHECK =================
-        # BLOCKED PATH
-        #if not allow_trade:
-            #decision = f"⛔ BLOCKED ({risk_block_reason})"
-
         # ================= FINAL TRADE LOGIC =================
-        
-        if pl_percent < -15:
-            decision = "⛔ BLOCKED (Heavy Loss)"
-
-        elif current_drawdown < -20:
-            decision = "⛔ DRAWDOWN LOCK - NO TRADE"
-        
-        elif not allow_trade:
+        if not allow_trade:
             decision = f"❌ BLOCKED ({risk_block_reason})"
+            
+        elif not allow_new_trades:
+            decision = "⛔ DRAWDOWN LOCK - NO TRADE"
 
         elif market_trend == "BEARISH":
-            decision = "⛔ NO TRADE (Market Weak)"          
-    
+            decision = "⛔ NO TRADE (Market Weak)" 
+
         elif pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
+            
+        #elif pl_percent < -15:
+            #decision = "⛔ BLOCKED (Heavy Loss)"
+
+        #elif current_drawdown < -20:
+            #decision = "⛔ DRAWDOWN LOCK - NO TRADE"
     
         elif trend_regime_ok and price > recent_high and volume > vol_avg:
             decision = "🚀 BUY BREAKOUT"
@@ -496,7 +495,7 @@ for i, row in enumerate(data_rows, start=2):
         elif decision == "🟢 BUY ON DIP":
             allocation_pct = 0.10
         
-        elif decision == "💰 BOOK PROFIT":
+        elif "BOOK PROFIT" in decision:
             allocation_pct = 0.0
         
         #elif decision == "⛔ NO TRADE (Market Weak)":
@@ -508,15 +507,13 @@ for i, row in enumerate(data_rows, start=2):
         else:
             allocation_pct = 0.0
         
-        # 🚫 final safety override
-        #if "BLOCKED" in decision or "STOP ADDING" in decision:
-            #allocation_pct = 0
-    
-        buy_amount = PROFIT_POOL * allocation_pct
-        buy_qty = int(buy_amount / price) if price > 0 else 0
-    
-        #if "AVOID" in decision:
-            #buy_qty = 0
+        # ================= FINAL SAFETY OVERRIDE =================
+        if ("BLOCKED" in decision) or ("DRAWDOWN" in decision):
+            allocation_pct = 0
+            buy_qty = 0
+        else:
+            buy_amount = PROFIT_POOL * allocation_pct
+            buy_qty = int(buy_amount / price) if price > 0 else 0
 
         # ================= STORE ROW =================
         # status = "HOLDING" if qty > 0 else "WATCHLIST"
