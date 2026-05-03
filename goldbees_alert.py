@@ -449,9 +449,16 @@ for i, row in enumerate(data_rows, start=2):
         # ================= TREND REGIME FILTER =================
         trend_regime_ok = (market_trend == "BULLISH")
         
-        # If blocked by stock-level or portfolio-level risk
-        if not allow_trade:
-            decision = f"❌ BLOCKED ({risk_block_reason})"
+        portfolio_warning_shown = False
+        
+        # FINAL BLOCK CHECK (single source of truth)
+        is_blocked = (risk_block_reason != "OK") or portfolio_locked
+        
+        if is_blocked:
+            if portfolio_locked:
+                decision = f"❌ BLOCKED (PORTFOLIO DRAWDOWN)"
+            else   
+                decision = f"❌ BLOCKED ({risk_block_reason})"
         
         # Normal profit booking
         elif pl_percent >= 10:
@@ -476,14 +483,18 @@ for i, row in enumerate(data_rows, start=2):
             decision = "⏳ HOLD"
 
         # Optional portfolio warning (DO NOT overwrite decision)
-        if portfolio_locked:
-            decision_note = "⚠️ PORTFOLIO RISK ACTIVE"
+        #if portfolio_locked:
+            #decision_note = "⚠️ PORTFOLIO RISK ACTIVE"
 
         # ===================== PRINT / LOG LINE =====================
         print(ticker, "Score:", score, "RSI:", rsi, "ADX:", adx, "Decision:", decision)
-        if portfolio_locked:
-            print("⚠️ Portfolio Drawdown Active")
 
+        # PRINT PORTFOLIO WARNING ONLY ONCE (NOT INSIDE LOOP)
+        #if portfolio_locked:
+            #portfolio_warning_shown = True
+        if portfolio_locked and portfolio_warning_shown:
+            print("⚠️ Portfolio Drawdown Active")
+            
         # ===================== LAYER 3: ALLOCATION OR POSITION SIZING =====================
         if decision == "🚀 BUY BREAKOUT":
             allocation_pct = 0.20
