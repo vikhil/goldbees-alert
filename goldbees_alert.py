@@ -464,13 +464,6 @@ for i, row in enumerate(data_rows, start=2):
         elif portfolio_locked:
             decision = "❌ BLOCKED (PORTFOLIO DRAWDOWN)"
 
-        if portfolio_locked:
-            breakout_allocation = 0.05
-            dip_allocation = 0.02
-        else:
-            breakout_allocation = 0.20
-            dip_allocation = 0.10
-            
         # Normal profit booking
         elif pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
@@ -493,6 +486,14 @@ for i, row in enumerate(data_rows, start=2):
         else:
             decision = "⏳ HOLD"
 
+        # ===================== ALLOCATION LOGIC (SEPARATE BLOCK) =====================
+        if portfolio_locked:
+            breakout_allocation = 0.05
+            dip_allocation = 0.02
+        else:
+            breakout_allocation = 0.20
+            dip_allocation = 0.10
+            
         # ===================== GLOBAL SAFETY OVERRIDE (CRITICAL) =====================
 
         #if portfolio_locked and ("BUY" in decision):
