@@ -411,32 +411,32 @@ for i, row in enumerate(data_rows, start=2):
             confidence = "⭐"
 
         # ===================== RISK ENGINE =====================
-        #allow_trade = True
+        
+        # Calculate current portfolio drawdown safely
+        current_drawdown = ((total_value - total_invested) / total_invested) * 100 if total_invested > 0 else 0        
+
+        # Default
+        risk_block_reason = "OK"
         
         # Hard loss protection
         if pl_percent < -15:
-            allow_trade = False
             risk_block_reason = "HEAVY LOSS"
         
         # Score gate
         elif score < 6:
-            allow_trade = False
             risk_block_reason = "LOW SCORE"
         
         # Market regime filter
         elif market_trend == "BEARISH":
-            allow_trade = False
             risk_block_reason = "BEAR MARKET"
         
-        # Drawdown protection (global safety)
-        elif total_invested > 0 and portfolio_pl < -20:
-        #elif total_invested > 0 and ((total_value - total_invested) / total_invested) < -0.20:    
-            allow_trade = False
+        # Global Drawdown protection
+        elif total_invested > 0 and current_drawdown < -20:
             risk_block_reason = "MAX DRAWDOWN HIT"
-        
-        else:
-            risk_block_reason = "OK"
-        
+            
+        # Final decision: allow or block trade
+        allow_trade = (risk_block_reason == "OK")
+    
         # ===================== LAYER 1: DECISION OR RISK FILTER =====================
         decision = "⏳ HOLD"
         allocation_pct = 0
@@ -444,7 +444,7 @@ for i, row in enumerate(data_rows, start=2):
 
         # ================= SCORE GATE =================
         #allow_trade = score >= 6   # define score gate here
-        allow_trade = (score >= 6) and (pl_percent > -15)
+        #allow_trade = (score >= 6) and (pl_percent > -15)
 
         # ================= TREND REGIME FILTER =================
         trend_regime_ok = (market_trend == "BULLISH")
@@ -458,30 +458,38 @@ for i, row in enumerate(data_rows, start=2):
         
         # ================= RISK + SCORE GATE CHECK =================
         # BLOCKED PATH
-        #if not allow_trade:
+        if not allow_trade:
             #decision = f"⛔ BLOCKED ({risk_block_reason})"
 
         # ================= FINAL TRADE LOGIC =================
+        decision = "⏳ HOLD"
+        
         if pl_percent < -15:
             decision = "⛔ BLOCKED (Heavy Loss)"
-        
-        elif not allow_new_trades:
+
+        elif current_drawdown < -20:
             decision = "⛔ DRAWDOWN LOCK - NO TRADE"
         
         elif not allow_trade:
-            decision = "❌ LOW SCORE - NO TRADE"
+            decision = f"❌ BLOCKED ({risk_block_reason})"
         
-        elif market_trend == "BEARISH":
-            decision = "⛔ NO TRADE (Market Weak)"            
-
-        #elif total_invested > 0 and ((total_value - total_invested) / total_invested) < -0.20:
+        #elif not allow_new_trades:
             #decision = "⛔ DRAWDOWN LOCK - NO TRADE"
+        
+        #elif not allow_trade:
+            #decision = "❌ LOW SCORE - NO TRADE"
+        
+        #elif market_trend == "BEARISH":
+            #decision = "⛔ NO TRADE (Market Weak)"            
     
         elif pl_percent >= 10:
             decision = "BOOK PROFIT 💰"
-        
-        elif trend_regime_ok and price > recent_high and volume > vol_avg:
+
+        elif market_trend == "BULLISH" and price > recent_high and volume > vol_avg:
             decision = "🚀 BUY BREAKOUT"
+    
+        #elif trend_regime_ok and price > recent_high and volume > vol_avg:
+        #    decision = "🚀 BUY BREAKOUT"
         
         elif price > ema50 and rsi > 45 and price > vwap and pl_percent < 0:
             decision = "🟢 BUY ON DIP"
@@ -594,92 +602,33 @@ else:
 
 messages.append(sector_msg)
 
-# ✅ ADD HERE (Telegram fix)
-#if messages:
- #   message_text = "\n".join(messages)
-  #  send_msg(message_text)
-#else:
- #   print("No messages to send to Telegram")
-
-# --- GOOGLE SHEETS UPDATE ---    
-# print("Sending batch update to Google Sheets...")
-# sheet.update(full_data)
-
 # ===================== GOOGLE SHEETS (ROW SAFE BATCH UPDATE) =====================
-
-batch_data = []
+if updates:
+    print(f"Updating {len(updates)} rows in Google Sheet...")
+    
+    batch_data = []
 
 # ===================== BULK SHEET UPDATE =====================
 
-# Get full sheet again (including header)
-full_data = sheet.get_all_values(value_render_option="UNFORMATTED_VALUE")
-
 # Ensure enough columns exist
-required_cols = 15  # A to N
-# required_cols = 16  # A to P
-for r in range(len(full_data)):
-    if len(full_data[r]) < required_cols:
-        full_data[r].extend([""] * (required_cols - len(full_data[r])))
+#required_cols = 15  # A to N
 
-# Apply updates in memory
-for u in updates:
-    row_idx = u["row"] - 1  # zero-based index
-
-    # ✅ Ensure row exists
-    while len(full_data) <= row_idx:
-        full_data.append([""] * required_cols)
-        
-    for col_offset, value in enumerate(u["data"]):
-    # required_length = 3 + col_offset + 1
-        col_idx = 3 + col_offset  # Column D = index 3
-        
-        # ✅ Ensure row has enough columns
-        while len(full_data[row_idx]) <= col_idx:
-            full_data[row_idx].append("")
-        
-        # ✅ Assign value
-        # full_data[row_idx][3 + col_offset] = value   # Column D = index 3
-        full_data[row_idx][col_idx] = value
 
 # Push everything in ONE API call
-for u in updates:
-    batch_data.append({
-        "range": f"D{u['row']}:P{u['row']}",
-# "values": [u["data"]]
-        "values": [[safe_float(x) if isinstance(x, (int, float)) else x for x in u["data"]]]
-    })
-
-if batch_data:
-    print(f"Updating {len(batch_data)} rows in Google Sheet...")
+    for u in updates:
+        batch_data.append({
+            "range": f"D{u['row']}:O{u['row']}",  # Columns D to O
+            "values": [u["data"]]
+        })
 
     try:
-        #sheet.batch_update([
-            #{
-               # "range": item["range"],
-               # "values": item["values"]
-            #}
-            #for item in batch_data
-        #])
-        cell_updates = []
-
-        for u in updates:
-            row = u["row"]
-            values = u["data"]
-        
-            for idx, val in enumerate(values):
-                col = chr(68 + idx)  # D = 68 ASCII
-                cell_updates.append({
-                    "range": f"{col}{row}",
-                    "values": [[val]]
-                })
-        if cell_updates:
-            sheet.batch_update(cell_updates)
-            print("✅ Sheet update successful")
-        else:
-            print("No updates to push")
-            
+        sheet.batch_update(batch_data)
+        print("✅ Google Sheet updated successfully")
     except Exception as e:
-        print("❌ Google Sheets batch update failed:", e)
+        print("❌ Google Sheets update failed:", e)
+
+else:
+    print("⚠️ No updates to push")
 
 # ===================== SUMMARY =====================
 if total_invested > 0:
@@ -687,8 +636,6 @@ if total_invested > 0:
 else:
     portfolio_pl = 0
     
-messages.append(f"\n📊 *Portfolio P/L:* {round(portfolio_pl,2)}%")
-
 # ================= MAX DRAWDOWN CONTROL =================
 max_drawdown_limit = -20  # %
 allow_new_trades = True
