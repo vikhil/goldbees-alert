@@ -543,7 +543,8 @@ for i, row in enumerate(data_rows, start=2):
             print("⚠️ Portfolio Drawdown Active")
             
         # ===================== LAYER 3: ALLOCATION OR POSITION SIZING =====================
-        if decision == "🚀 BUY BREAKOUT":
+        #if decision == "🚀 BUY BREAKOUT":
+         decision_type = "BUY_BREAKOUT"
             allocation_pct = breakout_allocation
         
         elif decision == "🟢 BUY ON DIP":
