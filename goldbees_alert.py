@@ -477,15 +477,16 @@ for i, row in enumerate(data_rows, start=2):
         
         # FINAL BLOCK CHECK (single source of truth)
         is_blocked = (risk_block_reason != "OK") or portfolio_locked
-
+        
         if is_blocked:
-            recovery_mode = "NORMAL"
-            
             if portfolio_locked:
                 decision = f"❌ BLOCKED (PORTFOLIO DRAWDOWN)"
             else:   
                 decision = f"❌ BLOCKED ({risk_block_reason})"
-        
+
+            allocation_pct = 0
+            buy_qty = 0
+    
         # 🚨 HARD STOP: No new trades during portfolio drawdown
         #elif portfolio_locked:
             #decision = "❌ BLOCKED (PORTFOLIO DRAWDOWN)"
