@@ -415,6 +415,30 @@ for i, row in enumerate(data_rows, start=2):
         # ================= SAFE METRICS =================
         current_drawdown = ((total_value - total_invested) / total_invested) * 100 if total_invested > 0 else 0        
 
+        # ===================== RECOVERY MODE ENGINE =====================
+        drawdown_active = current_drawdown < -20
+        
+        if current_drawdown < -30:
+            recovery_mode = "AGGRESSIVE_RECOVERY"
+        elif current_drawdown < -20:
+            recovery_mode = "CONTROLLED_RECOVERY"
+        else:
+            recovery_mode = "NORMAL"
+
+        # ===================== ENTRY THRESHOLD ENGINE =====================
+
+        if recovery_mode == "AGGRESSIVE_RECOVERY":
+            min_score = 9
+            min_rsi = 65
+        
+        elif recovery_mode == "CONTROLLED_RECOVERY":
+            min_score = 7
+            min_rsi = 55
+        
+        else:
+            min_score = 6
+            min_rsi = 45
+        
         # Default risk state
         risk_block_reason = "OK"
 
@@ -435,8 +459,8 @@ for i, row in enumerate(data_rows, start=2):
         # ================= PORTFOLIO RISK =================
         portfolio_locked = False
         
-        # Portfolio drawdown protection
-        if total_invested > 0 and current_drawdown < -20:
+        # Portfolio drawdown protection # Only extreme protection freeze
+        if total_invested > 0 and current_drawdown < -30:
             portfolio_locked = True
         
         # Final trade permission (SINGLE SOURCE OF TRUTH)
@@ -455,14 +479,16 @@ for i, row in enumerate(data_rows, start=2):
         is_blocked = (risk_block_reason != "OK") or portfolio_locked
 
         if is_blocked:
+            recovery_mode = "NORMAL"
+            
             if portfolio_locked:
                 decision = f"❌ BLOCKED (PORTFOLIO DRAWDOWN)"
             else:   
                 decision = f"❌ BLOCKED ({risk_block_reason})"
         
         # 🚨 HARD STOP: No new trades during portfolio drawdown
-        elif portfolio_locked:
-            decision = "❌ BLOCKED (PORTFOLIO DRAWDOWN)"
+        #elif portfolio_locked:
+            #decision = "❌ BLOCKED (PORTFOLIO DRAWDOWN)"
 
         # Normal profit booking
         elif pl_percent >= 10:
@@ -473,7 +499,7 @@ for i, row in enumerate(data_rows, start=2):
             decision = "⛔ NO TRADE (Market Weak)"
 
         # Entry conditions
-        elif trend_regime_ok and price > recent_high and volume > vol_avg:
+        elif trend_regime_ok and price > recent_high and volume > vol_avg and score >= min_score and rsi >= min_rsi:
             decision = "🚀 BUY BREAKOUT"
         
         elif price > ema50 and rsi > 45 and price > vwap and pl_percent < 0:
@@ -487,9 +513,16 @@ for i, row in enumerate(data_rows, start=2):
             decision = "⏳ HOLD"
 
         # ===================== ALLOCATION LOGIC (SEPARATE BLOCK) =====================
-        if portfolio_locked:
-            breakout_allocation = 0.05
-            dip_allocation = 0.02
+        # ===================== DYNAMIC ALLOCATION ENGINE =====================
+
+        if recovery_mode == "AGGRESSIVE_RECOVERY":
+            breakout_allocation = 0.08
+            dip_allocation = 0.03
+        
+        elif recovery_mode == "CONTROLLED_RECOVERY":
+            breakout_allocation = 0.12
+            dip_allocation = 0.06
+        
         else:
             breakout_allocation = 0.20
             dip_allocation = 0.10
@@ -510,38 +543,22 @@ for i, row in enumerate(data_rows, start=2):
             
         # ===================== LAYER 3: ALLOCATION OR POSITION SIZING =====================
         if decision == "🚀 BUY BREAKOUT":
-            allocation_pct = 0.20
+            allocation_pct = breakout_allocation
         
         elif decision == "🟢 BUY ON DIP":
-            allocation_pct = 0.10
+            allocation_pct = dip_allocation
         
         elif "BOOK PROFIT" in decision:
             allocation_pct = 0.0
-        
-        #elif decision == "⛔ NO TRADE (Market Weak)":
-            #allocation_pct = 0.0
-
-        #elif decision == "⛔ BLOCKED (Heavy Loss)":
-            #allocation_pct = 0.0
 
         else:
             allocation_pct = 0.0
         
         # ================= FINAL SAFETY OVERRIDE =================
-        # Force block all BUY signals during drawdown
-        #if portfolio_locked and ("BUY" in decision):
-            #decision = "❌ BLOCKED (PORTFOLIO DRAWDOWN)"
-            #allocation_pct = 0
-            #buy_qty = 0
-         
         # Also ensure allocation is zero for any BLOCKED decision
         if "BLOCKED" in decision:
             allocation_pct = 0
             buy_qty = 0   
-        
-        #if ("BLOCKED" in decision) or ("DRAWDOWN" in decision):
-            #allocation_pct = 0
-            #buy_qty = 0
         else:
             buy_amount = PROFIT_POOL * allocation_pct
             buy_qty = int(buy_amount / price) if price > 0 else 0
