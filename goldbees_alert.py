@@ -11,6 +11,34 @@ import pytz
 import math
 import time
 
+# ===================== TELEGRAM =====================
+def send_msg(message_text):
+    if not TOKEN or not CHAT_ID:
+        print("Missing Telegram credentials")
+        return
+
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        res = requests.get(url, params={
+            "chat_id": CHAT_ID,
+            "text": str(message_text)[:4000],
+            "parse_mode": None
+        }, timeout=10)
+
+        if res.status_code == 429:
+            retry_after = res.json().get("parameters", {}).get("retry_after", 5)
+            print(f"Rate limited. Retrying after {retry_after}s")
+            time.sleep(retry_after)
+            return send_msg(message_text)
+            
+        print("Telegram response:", res.status_code)
+
+        if res.status_code != 200:
+            print("Telegram error:", res.text)
+
+    except Exception as e:
+        print("Telegram exception:", e)
+    
 # ===================== PRE-MARKET REPORT =====================
 def send_premarket_report():
     try:
@@ -129,34 +157,6 @@ SECTOR_MAP = {
     "RVNL.NS": "INFRA",
 }
 
-# ===================== TELEGRAM =====================
-def send_msg(message_text):
-    if not TOKEN or not CHAT_ID:
-        print("Missing Telegram credentials")
-        return
-
-    try:
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        res = requests.get(url, params={
-            "chat_id": CHAT_ID,
-            "text": message_text,
-            "parse_mode": "Markdown"
-        }, timeout=10)
-
-        if res.status_code == 429:
-            retry_after = res.json().get("parameters", {}).get("retry_after", 5)
-            print(f"Rate limited. Retrying after {retry_after}s")
-            time.sleep(retry_after)
-            return send_msg(message_text)
-            
-        print("Telegram response:", res.status_code)
-
-        if res.status_code != 200:
-            print("Telegram error:", res.text)
-
-    except Exception as e:
-        print("Telegram exception:", e)
-    
 # ===================== RSI =====================
 def calculate_rsi(data, period=14):
     delta = data['Close'].diff()
@@ -206,14 +206,32 @@ minute = datetime.now(IST).minute
 #    send_msg("⏳ Market Closed - No update")
 #    exit()
 
-# ===================== NIFTY TREND (FIXED) =====================
-nifty = yf.download("^NSEI", period="5d", interval="15m", progress=False)
-nifty['EMA50'] = nifty['Close'].ewm(span=50).mean()
+# ===================== NIFTY TREND (SAFE) =====================
 
-nifty_price = nifty['Close'].iloc[-1].item()
-nifty_ema = nifty['EMA50'].iloc[-1].item()
+try:
+    nifty = yf.download(
+        "^NSEI",
+        period="5d",
+        interval="15m",
+        progress=False,
+        threads=False
+    )
+    
+    if if nifty is None or nifty.empty or len(nifty) < 50:
+        market_trend = "BEARISH"
+        return
+        
+    else:
+        nifty['EMA50'] = nifty['Close'].ewm(span=50).mean()
 
-market_trend = "BULLISH" if nifty_price > nifty_ema else "BEARISH"
+        nifty_price = safe_float(nifty['Close'].iloc[-1])
+        nifty_ema = safe_float(nifty['EMA50'].iloc[-1])
+
+        market_trend = "BULLISH" if nifty_price > nifty_ema else "BEARISH"
+
+except Exception as e:
+    print("NIFTY fetch failed:", e)
+    market_trend = "BEARISH"
 
 # ===================== TRACKING =====================
 messages = []
@@ -225,11 +243,15 @@ sector_summary = []
 
 print("Script started")
 
+portfolio_warning_shown = False
+
 send_premarket_report()   # ✅ ADD THIS LINE HERE
 
 total_invested = 0
 total_value = 0
-   
+
+portfolio_positions = []
+
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
    # time.sleep(0.2)
@@ -240,9 +262,24 @@ for i, row in enumerate(data_rows, start=2):
         if not ticker:
             updates.append({
                 "row": actual_row,
-                "data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", "", ""]
+                #"data": ["", "", "❌ Invalid", "", "", "", "", "", "", "", "", ""]
+                "data": [current_time, "", "", "INVALID", "", "", "", "", "", "❌ Invalid", "0%", 0]
             })
             continue
+
+        # ===================== FINAL PORTFOLIO CALCULATION =====================
+
+        total_invested = 0
+        total_value = 0
+        
+        for p in portfolio_positions:
+            total_invested += p["qty"] * p["buy_price"]
+            total_value += p["qty"] * p["price"]
+        
+        portfolio_pl = (
+            ((total_value - total_invested) / total_invested) * 100
+            if total_invested > 0 else 0
+        )
 
         # ===================== Handle empty qty/buy price gracefully =====================
 
@@ -270,7 +307,14 @@ for i, row in enumerate(data_rows, start=2):
             if price is None or pd.isna(price):
                 print(f"Skipping {ticker} due to invalid price")
                 continue
-
+            
+            # ================= PORTFOLIO TRACKING =================
+            portfolio_positions.append({
+                "qty": qty,
+                "buy_price": buy_price,
+                "price": safe_float(price)
+            })
+        
         except Exception as e:
             print(f"Yahoo error for {ticker}: {e}")
             invalid_tickers.append(ticker)
@@ -326,12 +370,13 @@ for i, row in enumerate(data_rows, start=2):
         recent_high = safe_float(data['High'].rolling(20).max().iloc[-2])
         vwap = safe_float(data['VWAP'].iloc[-1])  
         
-        adx_val = data['ADX'].iloc[-1]
+        #adx_val = data['ADX'].iloc[-1]
         adx = safe_float(data['ADX'].iloc[-1])
         
         # ================= TREND REGIME FILTER =================
-        trend_regime_ok = (price > ema50) and (adx > 25)
-
+        trend_regime_ok = (market_trend == "BULLISH" and price > ema50 and adx > 25)
+        #trend_regime_ok = (price > ema50) and (adx > 25)
+        
         # ✅ ADD THIS BLOCK HERE
         if pd.isna(price) or pd.isna(rsi) or pd.isna(adx):
             print(f"Skipping {ticker} due to NaN values")
@@ -388,8 +433,8 @@ for i, row in enumerate(data_rows, start=2):
         sector_data[sector]["total_pl"] += pl_percent
         sector_data[sector]["count"] += 1
 
-        total_invested += qty * buy_price
-        total_value += qty * price
+        #total_invested += qty * buy_price
+        #total_value += qty * price
 
         # ================= TARGET / SL =================
         if price > ema50 and rsi > 60:
@@ -467,21 +512,22 @@ for i, row in enumerate(data_rows, start=2):
         #allow_trade = (risk_block_reason == "OK") and (not portfolio_locked)
     
         # ===================== LAYER 1: DECISION OR RISK FILTER =====================
+        decision_type = "⏳ HOLD"
         decision = "⏳ HOLD"
+
         #decision_note = ""
 
-        # ================= TREND REGIME FILTER =================
-        trend_regime_ok = (market_trend == "BULLISH")
-        
-        portfolio_warning_shown = False
-        
+        # ================= MARKET REGIME FILTER =================
+        #market_regime_ok = (market_trend == "BULLISH")
+                
         # FINAL BLOCK CHECK (single source of truth)
         is_blocked = (risk_block_reason != "OK") or portfolio_locked
         
         if is_blocked:
             if portfolio_locked:
                 decision = f"❌ BLOCKED (PORTFOLIO DRAWDOWN)"
-            else:   
+            else:
+                decision_type = "BLOCKED"
                 decision = f"❌ BLOCKED ({risk_block_reason})"
 
             allocation_pct = 0
@@ -493,6 +539,7 @@ for i, row in enumerate(data_rows, start=2):
 
         # Normal profit booking
         elif pl_percent >= 10:
+            decision_type = "BOOK_PROFIT"
             decision = "BOOK PROFIT 💰"
             
         # Market-level filter (kept AFTER risk gating)
@@ -501,9 +548,12 @@ for i, row in enumerate(data_rows, start=2):
 
         # Entry conditions
         elif trend_regime_ok and price > recent_high and volume > vol_avg and score >= min_score and rsi >= min_rsi:
+        #elif market_regime_ok and trend_regime_ok and price > recent_high and volume > vol_avg and score >= min_score and rsi >= min_rsi:    
+            decision_type = "BUY_BREAKOUT"
             decision = "🚀 BUY BREAKOUT"
         
-        elif price > ema50 and rsi > 45 and price > vwap and pl_percent < 0:
+        elif price > ema50 and 45 <= rsi <= 65 and price > vwap and pl_percent < 0:
+            decision_type = "BUY_DIP"
             decision = "🟢 BUY ON DIP"
             
         # Exit condition
@@ -543,22 +593,27 @@ for i, row in enumerate(data_rows, start=2):
             print("⚠️ Portfolio Drawdown Active")
             
         # ===================== LAYER 3: ALLOCATION OR POSITION SIZING =====================
-        #if decision == "🚀 BUY BREAKOUT":
-         decision_type = "BUY_BREAKOUT"
-            allocation_pct = breakout_allocation
+
+        if decision == "🚀 BUY BREAKOUT":
+            decision_type = "BUY_BREAKOUT"
+            #allocation_pct = breakout_allocation
         
         elif decision == "🟢 BUY ON DIP":
-            allocation_pct = dip_allocation
+            decision_type = "BUY_DIP"
+            #allocation_pct = dip_allocation
         
         elif "BOOK PROFIT" in decision:
-            allocation_pct = 0.0
+            decision_type = "BOOK_PROFIT"
+            #allocation_pct = 0.0
 
         else:
-            allocation_pct = 0.0
+            decision_type = "HOLD"
+            #allocation_pct = 0.0
         
         # ================= FINAL SAFETY OVERRIDE =================
         # Also ensure allocation is zero for any BLOCKED decision
-        if "BLOCKED" in decision:
+        #if "BLOCKED" in decision:
+        if decision_type == "BLOCKED":
             allocation_pct = 0
             buy_qty = 0   
         else:
@@ -601,11 +656,11 @@ for i, row in enumerate(data_rows, start=2):
         print(f"Main loop error at row {i}: {e}")
         continue
 
-# print("Updates count:", len(updates))
-# print("Messages count:", len(messages))
-print(f"Updates count: {len(updates)}")
-print(f"Messages count: {len(messages)}")
-
+    # print("Updates count:", len(updates))
+    # print("Messages count:", len(messages))
+    print(f"Updates count: {len(updates)}")
+    print(f"Messages count: {len(messages)}")
+    
 sector_summary = []
 
 for sector, data in sector_data.items():
