@@ -217,7 +217,7 @@ try:
         threads=False
     )
     
-    if if nifty is None or nifty.empty or len(nifty) < 50:
+    if nifty is None or nifty.empty or len(nifty) < 50:
         market_trend = "BEARISH"
         return
         
