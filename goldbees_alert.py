@@ -378,7 +378,8 @@ for i, row in enumerate(data_rows, start=2):
         #trend_regime_ok = (price > ema50) and (adx > 25)
         
         # ✅ ADD THIS BLOCK HERE
-        if pd.isna(price) or pd.isna(rsi) or pd.isna(adx):
+        #if pd.isna(price) or pd.isna(rsi) or pd.isna(adx):
+        if any(pd.isna(x) for x in [price, rsi, adx, vwap, ema50, volume]):    
             print(f"Skipping {ticker} due to NaN values")
             continue
         
@@ -507,6 +508,11 @@ for i, row in enumerate(data_rows, start=2):
         # Portfolio drawdown protection # Only extreme protection freeze
         if total_invested > 0 and current_drawdown < -30:
             portfolio_locked = True
+
+        # Print warning only once
+        if portfolio_locked and not portfolio_warning_shown:
+            print("⚠️ Portfolio Drawdown Active")
+            portfolio_warning_shown = True
         
         # Final trade permission (SINGLE SOURCE OF TRUTH)
         #allow_trade = (risk_block_reason == "OK") and (not portfolio_locked)
@@ -589,8 +595,8 @@ for i, row in enumerate(data_rows, start=2):
         # PRINT PORTFOLIO WARNING ONLY ONCE (NOT INSIDE LOOP)
         #if portfolio_locked:
             #portfolio_warning_shown = True
-        if portfolio_locked and portfolio_warning_shown:
-            print("⚠️ Portfolio Drawdown Active")
+        #if portfolio_locked and portfolio_warning_shown:
+            #print("⚠️ Portfolio Drawdown Active")
             
         # ===================== LAYER 3: ALLOCATION OR POSITION SIZING =====================
 
