@@ -219,7 +219,6 @@ try:
     
     if nifty is None or nifty.empty or len(nifty) < 50:
         market_trend = "BEARISH"
-        return
         
     else:
         nifty['EMA50'] = nifty['Close'].ewm(span=50).mean()
