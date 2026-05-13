@@ -112,9 +112,17 @@ def send_premarket_report():
         
 def safe_float(x):
     try:
-        if x is None or (isinstance(x, float) and math.isnan(x)):
+        if x is None:
             return 0.0
+
+        if isinstance(x, pd.Series):
+            x = x.iloc[0]
+
+        if pd.isna(x):
+            return 0.0
+
         return float(x)
+
     except:
         return 0.0
 
@@ -250,6 +258,47 @@ total_invested = 0
 total_value = 0
 
 portfolio_positions = []
+
+# ===================== PRE-CALCULATE PORTFOLIO =====================
+
+for row in data_rows:
+
+    try:
+        ticker = format_ticker(row[0] if len(row) > 0 else "")
+
+        if not ticker:
+            continue
+
+        qty = safe_float(row[1]) if len(row) > 1 else 0
+        buy_price = safe_float(row[2]) if len(row) > 2 else 0
+
+        data = yf.download(
+            ticker,
+            period="5d",
+            interval="15m",
+            progress=False,
+            threads=False
+        )
+
+        if data is None or data.empty:
+            continue
+
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = data.columns.get_level_values(0)
+
+        price = safe_float(data['Close'].iloc[-1])
+
+        total_invested += qty * buy_price
+        total_value += qty * price
+
+    except:
+        continue
+
+# Final portfolio drawdown
+current_drawdown = (
+    ((total_value - total_invested) / total_invested) * 100
+    if total_invested > 0 else 0
+)
 
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
@@ -439,10 +488,13 @@ for i, row in enumerate(data_rows, start=2):
         # ================= TARGET / SL =================
         if price > ema50 and rsi > 60:
             target = price * 1.06
+            
         elif price > ema50:
             target = price * 1.04
+            
         else:
-            target = max(price * 1.02, ema50)  # prevent illogical targets
+            #target = max(price * 1.02, ema50)  # prevent illogical targets
+            target = price * 0.98
 
         stop_loss = buy_price * 0.98
         trail_stop = price * 0.97
@@ -456,10 +508,7 @@ for i, row in enumerate(data_rows, start=2):
             confidence = "⭐"
 
         # ===================== RISK ENGINE =====================
-        
-        # ================= SAFE METRICS =================
-        current_drawdown = ((total_value - total_invested) / total_invested) * 100 if total_invested > 0 else 0        
-
+           
         # ===================== RECOVERY MODE ENGINE =====================
         drawdown_active = current_drawdown < -20
         
@@ -494,7 +543,7 @@ for i, row in enumerate(data_rows, start=2):
             risk_block_reason = "HEAVY LOSS"
         
         # Score gate
-        elif score < 6:
+        elif score < 5:
             risk_block_reason = "LOW SCORE"
         
         # Market regime filter
