@@ -112,13 +112,10 @@ def send_premarket_report():
         
 def safe_float(x):
     try:
-        if x is None:
-            return 0.0
-
         if isinstance(x, pd.Series):
             x = x.iloc[0]
 
-        if pd.isna(x):
+        if x is None or pd.isna(x):
             return 0.0
 
         return float(x)
@@ -300,6 +297,20 @@ current_drawdown = (
     if total_invested > 0 else 0
 )
 
+# ===================== FINAL PORTFOLIO CALCULATION =====================
+
+        total_invested = 0
+        total_value = 0
+        
+        for p in portfolio_positions:
+            total_invested += p["qty"] * p["buy_price"]
+            total_value += p["qty"] * p["price"]
+        
+        portfolio_pl = (
+            ((total_value - total_invested) / total_invested) * 100
+            if total_invested > 0 else 0
+        )
+
 # ===================== MAIN LOOP =====================
 for i, row in enumerate(data_rows, start=2):
    # time.sleep(0.2)
@@ -314,20 +325,6 @@ for i, row in enumerate(data_rows, start=2):
                 "data": [current_time, "", "", "INVALID", "", "", "", "", "", "❌ Invalid", "0%", 0]
             })
             continue
-
-        # ===================== FINAL PORTFOLIO CALCULATION =====================
-
-        total_invested = 0
-        total_value = 0
-        
-        for p in portfolio_positions:
-            total_invested += p["qty"] * p["buy_price"]
-            total_value += p["qty"] * p["price"]
-        
-        portfolio_pl = (
-            ((total_value - total_invested) / total_invested) * 100
-            if total_invested > 0 else 0
-        )
 
         # ===================== Handle empty qty/buy price gracefully =====================
 
@@ -494,8 +491,9 @@ for i, row in enumerate(data_rows, start=2):
             
         else:
             #target = max(price * 1.02, ema50)  # prevent illogical targets
-            target = price * 0.98
-
+            #target = price * 0.98
+            target = price * 1.02
+            
         stop_loss = buy_price * 0.98
         trail_stop = price * 0.97
     
@@ -547,7 +545,7 @@ for i, row in enumerate(data_rows, start=2):
             risk_block_reason = "LOW SCORE"
         
         # Market regime filter
-        elif market_trend == "BEARISH":
+        elif market_trend == "BEARISH" :
             risk_block_reason = "BEAR MARKET"
 
         # ================= PORTFOLIO RISK =================
@@ -568,11 +566,6 @@ for i, row in enumerate(data_rows, start=2):
         # ===================== LAYER 1: DECISION OR RISK FILTER =====================
         decision_type = "⏳ HOLD"
         decision = "⏳ HOLD"
-
-        #decision_note = ""
-
-        # ================= MARKET REGIME FILTER =================
-        #market_regime_ok = (market_trend == "BULLISH")
                 
         # FINAL BLOCK CHECK (single source of truth)
         is_blocked = (risk_block_reason != "OK") or portfolio_locked
@@ -586,23 +579,24 @@ for i, row in enumerate(data_rows, start=2):
 
             allocation_pct = 0
             buy_qty = 0
-    
-        # 🚨 HARD STOP: No new trades during portfolio drawdown
-        #elif portfolio_locked:
-            #decision = "❌ BLOCKED (PORTFOLIO DRAWDOWN)"
-
-        # Normal profit booking
-        elif pl_percent >= 10:
-            decision_type = "BOOK_PROFIT"
-            decision = "BOOK PROFIT 💰"
             
-        # Market-level filter (kept AFTER risk gating)
-        elif market_trend == "BEARISH":
+        # Market-level filter ONLY for fresh entries
+        elif market_trend == "BEARISH" and qty == 0:
             decision = "⛔ NO TRADE (Market Weak)"
+
+        # Existing holdings should still be managed normally
+        elif pl_percent > 15:
+            decision_type = "BOOK_PROFIT"
+            decision = "💰 PARTIAL PROFIT BOOK"
+
+        elif pl_percent > 5:
+            decision = "📈 HOLD WINNER"
+        
+        elif pl_percent < -15:
+            decision = "🛑 EXIT ON WEAKNESS"
 
         # Entry conditions
         elif trend_regime_ok and price > recent_high and volume > vol_avg and score >= min_score and rsi >= min_rsi:
-        #elif market_regime_ok and trend_regime_ok and price > recent_high and volume > vol_avg and score >= min_score and rsi >= min_rsi:    
             decision_type = "BUY_BREAKOUT"
             decision = "🚀 BUY BREAKOUT"
         
